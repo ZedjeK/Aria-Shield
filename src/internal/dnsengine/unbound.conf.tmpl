@@ -1,0 +1,34 @@
+# Généré par Aria Shield à chaque démarrage : les modifications manuelles seront écrasées.
+server:
+    verbosity: 1
+    port: 53
+    interface: 127.0.0.1
+    access-control: 127.0.0.0/8 allow
+{{IPV6}}
+    directory: "{{DIR}}"
+    logfile: "{{DIR}}/unbound.log"
+    use-syslog: no
+
+    # Vie privée
+    qname-minimisation: yes
+    hide-identity: yes
+    hide-version: yes
+
+    # Durcissement et DNSSEC
+    harden-glue: yes
+    harden-dnssec-stripped: yes
+    harden-below-nxdomain: yes
+    aggressive-nsec: yes
+    auto-trust-anchor-file: "{{DIR}}/root.key"
+
+    # Confort
+    prefetch: yes
+
+    # Marqueur : prouve que Windows passe bien par ce résolveur
+    local-zone: "aria-shield.test." static
+    local-data: "check.aria-shield.test. 60 IN A 192.0.2.53"
+
+remote-control:
+    control-enable: no
+
+# Volontairement aucun forward-zone : récursion complète, aucun DNS tiers

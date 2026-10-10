@@ -1,0 +1,24 @@
+# Build Wails généré par build.ps1
+.work/
+
+# Exe compilé : publié dans les Releases GitHub (trop lourd pour le dépôt)
+Aria-Shield.exe
+*.exe.part*
+
+# Tor Browser embarqué (113 Mo, au-delà de la limite GitHub de 100 Mo) :
+# build.ps1 le télécharge sur dist.torproject.org avant de compiler
+src/internal/torbrowser/assets/tor-browser-portable.exe
+src/internal/torbrowser/assets/tor-browser-portable.exe.asc
+
+# Données locales d'Aria (profil VPN chiffré, photo DNS, Tor Browser extrait)
+AriaShield-data/
+
+# Frontend
+node_modules/
+src/frontend/dist/
+src/frontend/bindings/
+
+# Divers
+*.log
+.DS_Store
+Thumbs.db

@@ -1,0 +1,279 @@
+:root {
+  --bg: #0f1216;
+  --sidebar: #12151a;
+  --surface: #161a20;
+  --surface-sunken: #0f1216;
+  --hover: #1c2129;
+  --line: #242a33;
+  --line-soft: #20252d;
+  --line-strong: #3a414d;
+  --text: #e6e8ec;
+  --muted: #9aa3b2;
+  --faint: #8e97a6;
+  --accent: #34d399;
+  --ghost: #b49cff;
+  --warn: #f5a524;
+  --danger: #f87171;
+
+  --font-display: 'Space Grotesk', system-ui, sans-serif;
+  --font-body: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+#app {
+  height: 100%;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+button:disabled {
+  cursor: not-allowed;
+}
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 10px;
+  border: 3px solid var(--bg);
+}
+
+/* ---------- Briques communes aux pages ---------- */
+
+.page {
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 1100px;
+}
+
+.page-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.page-head h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 700;
+}
+.page-intro {
+  margin: -8px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+  max-width: 640px;
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+@container (min-width: 600px) {
+  .grid-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.card h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+}
+.card-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.eyebrow {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--faint);
+}
+.hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--faint);
+}
+.error {
+  margin: 0;
+  font-size: 13px;
+  color: var(--danger);
+}
+.path {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--faint);
+  word-break: break-all;
+}
+.banner {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(245, 165, 36, 0.12);
+  border: 1px solid rgba(245, 165, 36, 0.4);
+  color: #f8c46b;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+/* Boutons */
+.actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.btn-primary,
+.btn-ghost {
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.btn-primary {
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  color: #08130e;
+}
+.btn-ghost {
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  color: var(--text);
+}
+.btn-ghost:hover:not(:disabled) {
+  background: var(--hover);
+}
+.btn-primary:disabled,
+.btn-ghost:disabled {
+  opacity: 0.45;
+}
+.grow {
+  flex: 1;
+}
+
+/* Pastilles d'état */
+.pill,
+.chip {
+  flex: none;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: var(--line-soft);
+  color: var(--muted);
+}
+.pill.on,
+.chip.ok {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+}
+.chip.fail {
+  background: rgba(248, 113, 113, 0.14);
+  color: var(--danger);
+}
+
+/* Lignes de liste */
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+}
+.row + .row {
+  border-top: 1px solid var(--line-soft);
+  padding-top: 10px;
+}
+.row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.row-name {
+  font-size: 14px;
+  font-weight: 500;
+}
+.row-detail {
+  font-size: 12px;
+  color: var(--faint);
+}
+
+/* Journal */
+.log {
+  margin: 0;
+  padding: 12px;
+  list-style: none;
+  background: var(--surface-sunken);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.log li {
+  display: flex;
+  gap: 8px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.log li span:first-child {
+  color: var(--accent);
+  flex: none;
+}
+.log li.fail span {
+  color: var(--danger);
+}
