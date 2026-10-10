@@ -3,7 +3,7 @@
 Un logiciel Windows portable pour naviguer discrètement, en un clic : résolveur DNS à toi, VPN avec kill switch, et Tor Browser.
 Rien à installer : tout tient dans un seul exe.
 
-> Version 0.6 · Windows 10/11 x64 · licence MIT
+> Version 0.6.1 · Windows 10/11 x64 · licence MIT
 
 ## Ce qu'il fait
 

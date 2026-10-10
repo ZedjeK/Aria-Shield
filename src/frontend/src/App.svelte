@@ -72,7 +72,7 @@
         <span class="nav-icon"><Icon name="restore" /></span>
         <span class="label">Tout restaurer</span>
       </button>
-      <span class="version label">v0.6</span>
+      <span class="version label">v0.6.1</span>
     </div>
   </nav>
 

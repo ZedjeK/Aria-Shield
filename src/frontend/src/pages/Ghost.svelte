@@ -11,7 +11,15 @@
   const protectedOn = $derived(app.status?.protected ?? false)
   const upd = $derived(tor.update)
 
-  onMount(refreshTor)
+  // Tor Browser peut être ouvert ou fermé à tout moment : on suit son état
+  // tant que la page est affichée (sinon le bouton reste sur « Déjà ouvert »).
+  onMount(() => {
+    refreshTor()
+    const timer = setInterval(() => {
+      if (!tor.busy) refreshTor()
+    }, 2000)
+    return () => clearInterval(timer)
+  })
 </script>
 
 <div class="page">
