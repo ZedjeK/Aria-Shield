@@ -50,7 +50,7 @@
   }
   .switch.on .knob {
     transform: translateX(22px);
-    background: #08130e;
+    background: #04121c;
   }
   .switch:disabled {
     opacity: 0.4;

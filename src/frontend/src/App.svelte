@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte'
   import Icon from './lib/Icon.svelte'
+  import Logo from './lib/Logo.svelte'
   import { app, refresh, startPolling, restoreAll, dismissNotice } from './lib/state.svelte.js'
   import Home from './pages/Home.svelte'
   import Resolver from './pages/Resolver.svelte'
@@ -9,11 +10,11 @@
   import Ghost from './pages/Ghost.svelte'
 
   const nav = [
-    { id: 'home', label: 'Accueil', icon: 'home' },
-    { id: 'dns', label: 'Résolveur DNS', icon: 'dns' },
-    { id: 'vpn', label: 'VPN', icon: 'vpn' },
-    { id: 'ghost', label: 'Mode Fantôme', icon: 'ghost' },
-    { id: 'tests', label: 'Tests', icon: 'tests' },
+    { id: 'home', label: 'Accueil', cmd: 'accueil', icon: 'home' },
+    { id: 'dns', label: 'Résolveur DNS', cmd: 'dns', icon: 'dns' },
+    { id: 'vpn', label: 'VPN', cmd: 'vpn', icon: 'vpn' },
+    { id: 'ghost', label: 'Mode Fantôme', cmd: 'fantôme', icon: 'ghost' },
+    { id: 'tests', label: 'Tests', cmd: 'tests', icon: 'tests' },
   ]
 
   const running = $derived(app.status?.dnsRunning ?? false)
@@ -27,35 +28,38 @@
   })
 </script>
 
+
 <div class="shell">
   <nav class="sidebar" aria-label="Sections">
     <div class="brand">
-      <span class="brand-icon"><Icon name="shield" size={22} /></span>
-      <span class="brand-name label">Aria Shield</span>
+      <Logo size={38} />
+      <span class="brand-name label"><span class="brand-top">ARIA</span><span class="brand-sub">SHIELD</span></span>
     </div>
 
     <ul class="nav">
       {#each nav as item (item.id)}
+        {@const lit = (item.id === 'dns' && running) || (item.id === 'vpn' && tunnelUp)}
         <li>
           <button
             class="nav-item"
             class:active={app.page === item.id}
             aria-current={app.page === item.id ? 'page' : undefined}
+            aria-label={item.label}
             title={item.label}
             onclick={() => (app.page = item.id)}
           >
             <span class="nav-icon">
               <Icon name={item.icon} />
-              {#if item.id === 'dns' && running}
-                <span class="dot" class:system={systemDns} aria-label={systemDns ? 'utilisé par Windows' : 'actif'}></span>
-              {/if}
-              {#if item.id === 'vpn' && tunnelUp}
-                <span class="dot" class:system={app.status?.protected} aria-label="tunnel ouvert"></span>
-              {/if}
+              {#if lit}<span class="dot icon-dot" aria-hidden="true"></span>{/if}
             </span>
-            <span class="label">{item.label}</span>
-            {#if item.soon}
-              <span class="soon label">Bientôt</span>
+            <span class="prompt label" aria-hidden="true">&gt;</span>
+            <span class="label">{item.cmd}</span>
+            {#if lit}
+              <span
+                class="dot label"
+                class:system={item.id === 'dns' ? systemDns : app.status?.protected}
+                aria-hidden="true"
+              ></span>
             {/if}
           </button>
         </li>
@@ -64,15 +68,16 @@
 
     <div class="sidebar-foot">
       <button
-        class="nav-item restore"
+        class="restore"
         disabled={!canRestore || app.busy}
+        aria-label="Tout restaurer"
         title={canRestore ? 'Tout restaurer : tunnel, DNS d\'origine et arrêt du résolveur' : 'Rien à restaurer'}
         onclick={restoreAll}
       >
-        <span class="nav-icon"><Icon name="restore" /></span>
-        <span class="label">Tout restaurer</span>
+        <span class="nav-icon"><Icon name="restore" size={18} /></span>
+        <span class="label">restaurer --tout</span>
       </button>
-      <span class="version label">v0.7</span>
+      <span class="version label">aria-shield v0.8</span>
     </div>
   </nav>
 
@@ -107,35 +112,42 @@
 <style>
   .shell {
     display: grid;
-    grid-template-columns: 240px minmax(0, 1fr);
+    grid-template-columns: 216px minmax(0, 1fr);
     height: 100vh;
   }
 
   .sidebar {
     background: var(--sidebar);
-    border-right: 1px solid var(--line);
-    padding: 16px 10px;
+    border-right: 1px solid var(--line-soft);
+    padding: 18px 12px;
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 20px;
     min-width: 0;
   }
   .brand {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 4px 12px 8px;
+    padding: 0 4px;
     min-height: 40px;
   }
-  .brand-icon {
-    color: var(--accent);
-    display: flex;
-  }
   .brand-name {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.15;
+  }
+  .brand-top {
     font-family: var(--font-display);
-    font-weight: 600;
-    font-size: 18px;
-    white-space: nowrap;
+    font-weight: 700;
+    font-size: 17px;
+    color: #ffffff;
+    letter-spacing: 0.5px;
+  }
+  .brand-sub {
+    font-size: 11px;
+    letter-spacing: 3px;
+    color: var(--accent);
   }
 
   .nav {
@@ -144,20 +156,21 @@
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 4px;
   }
   .nav-item {
-    position: relative;
     width: 100%;
-    min-height: 44px;
-    padding: 0 12px;
+    min-height: 42px;
+    padding: 0 10px;
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 8px;
     border: none;
-    border-radius: 10px;
+    border-radius: 8px 0;
+    corner-shape: bevel;
     background: transparent;
     color: var(--muted);
+    font-family: var(--font-mono);
     font-size: 14px;
     font-weight: 500;
     text-align: left;
@@ -167,47 +180,53 @@
     color: var(--text);
   }
   .nav-item.active {
-    background: var(--surface);
-    color: var(--text);
+    background: #0b1a30;
+    color: var(--accent);
   }
-  /* Petite barre d'accent façon Windows 11 */
-  .nav-item.active::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 50%;
-    width: 3px;
-    height: 18px;
-    margin-top: -9px;
-    border-radius: 3px;
-    background: var(--accent);
+  .prompt {
+    color: var(--dim);
   }
+  .nav-item.active .prompt {
+    color: var(--action);
+  }
+  /* En grand, la console suffit : les icônes servent quand la barre est repliée */
   .nav-icon {
     position: relative;
-    display: flex;
+    display: none;
     flex: none;
   }
   .dot {
+    flex: none;
+    margin-left: auto;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+    opacity: 0.65;
+  }
+  .dot.system {
+    opacity: 1;
+    box-shadow: 0 0 8px var(--accent);
+  }
+  .icon-dot {
     position: absolute;
     right: -3px;
     top: -3px;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--accent);
+    margin: 0;
+    opacity: 1;
     border: 2px solid var(--sidebar);
+    width: 9px;
+    height: 9px;
   }
-  .dot.system {
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent);
-  }
+
   .banner.info {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
     gap: 12px;
-    background: color-mix(in srgb, var(--accent) 10%, transparent);
+    background: color-mix(in srgb, var(--accent) 8%, transparent);
     border-color: color-mix(in srgb, var(--accent) 40%, transparent);
-    color: #9be8c6;
+    color: #bdf9ff;
   }
   .dismiss {
     flex: none;
@@ -228,29 +247,37 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .soon {
-    margin-left: auto;
-    font-size: 11px;
-    color: var(--faint);
-    background: var(--line-soft);
-    border-radius: 999px;
-    padding: 2px 8px;
-  }
 
   .sidebar-foot {
     margin-top: auto;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 8px;
   }
   .restore {
-    color: var(--warn);
+    min-height: 40px;
+    padding: 0 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border: 1px solid var(--line-strong);
+    border-radius: 8px 0;
+    corner-shape: bevel;
+    background: transparent;
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 13px;
+  }
+  .restore:hover:not(:disabled) {
+    border-color: var(--action);
+    color: var(--action);
   }
   .restore:disabled {
-    opacity: 0.5;
+    opacity: 0.45;
   }
   .version {
-    padding: 0 12px;
+    padding: 0 4px;
     font-family: var(--font-mono);
     font-size: 11px;
     color: var(--faint);
@@ -258,7 +285,7 @@
 
   .content {
     overflow-y: auto;
-    padding: 28px 32px 32px;
+    padding: 26px 30px 30px;
     display: flex;
     flex-direction: column;
     gap: 16px;
@@ -267,23 +294,28 @@
   /* Fenêtre étroite : la barre latérale se replie en icônes */
   @media (max-width: 760px) {
     .shell {
-      grid-template-columns: 64px minmax(0, 1fr);
+      grid-template-columns: 68px minmax(0, 1fr);
     }
     .sidebar {
       padding: 16px 8px;
       align-items: center;
     }
     .brand {
-      padding: 4px 0 8px;
+      padding: 0;
       justify-content: center;
     }
     .label {
       display: none;
     }
-    .nav-item {
+    .nav-icon {
+      display: flex;
+    }
+    .nav-item,
+    .restore {
       justify-content: center;
       padding: 0;
       width: 48px;
+      min-height: 48px;
     }
     .nav {
       align-items: center;

@@ -214,7 +214,8 @@
     width: 100%;
     min-height: 40px;
     padding: 0 12px;
-    border-radius: 10px;
+    border-radius: 8px 0;
+    corner-shape: bevel;
     border: 1px solid var(--line-strong);
     background: var(--surface-sunken);
     color: var(--text);

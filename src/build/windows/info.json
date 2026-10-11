@@ -1,0 +1,19 @@
+{
+  "fixed": {
+    "file_version": "0.8.0",
+    "product_version": "0.8.0"
+  },
+  "info": {
+    "0000": {
+      "ProductVersion": "0.8.0",
+      "FileVersion": "0.8.0",
+      "CompanyName": "ZedjeK",
+      "FileDescription": "Aria Shield",
+      "InternalName": "Aria-Shield",
+      "OriginalFilename": "Aria-Shield.exe",
+      "LegalCopyright": "© 2026 ZedjeK · licence MIT",
+      "ProductName": "Aria Shield",
+      "Comments": "Navigation discrète : résolveur DNS, VPN WireGuard et Tor Browser"
+    }
+  }
+}

@@ -3,7 +3,7 @@
 Un logiciel Windows portable pour naviguer discrètement, en un clic : résolveur DNS à toi, VPN avec kill switch, et Tor Browser.
 Rien à installer : tout tient dans un seul exe.
 
-> Version 0.7 · Windows 10/11 x64 · licence MIT
+> Version 0.8 · Windows 10/11 x64 · licence MIT
 
 ## Ce qu'il fait
 
@@ -30,7 +30,7 @@ Aria ne dépose rien à côté de l'exe. Elle range ses fichiers dans deux dossi
 
 Le second est verrouillé pour qu'aucun programme sans droits admin ne puisse y glisser un faux exécutable qu'Aria lancerait ensuite.
 
-**Pour tout désinstaller** : clique sur « Tout restaurer », ferme Aria, puis supprime l'exe et ces deux dossiers (le second demande une confirmation administrateur).
+**Pour tout désinstaller** : clique sur « restaurer --tout », ferme Aria, puis supprime l'exe et ces deux dossiers (le second demande une confirmation administrateur).
 
 Depuis la v0.7, l'ancien dossier `AriaShield-data` des versions précédentes est déplacé automatiquement vers ces emplacements au premier lancement, puis supprimé. Ferme l'ancienne version d'Aria avant de lancer la nouvelle.
 

@@ -1,22 +1,32 @@
+/* Thème « Terminal Néon Glace » : bleu nuit, néons cyan/bleu/blanc,
+   orange pour les actions principales, lavande pour le mode Fantôme. */
 :root {
-  --bg: #0f1216;
-  --sidebar: #12151a;
-  --surface: #161a20;
-  --surface-sunken: #0f1216;
-  --hover: #1c2129;
-  --line: #242a33;
-  --line-soft: #20252d;
-  --line-strong: #3a414d;
-  --text: #e6e8ec;
-  --muted: #9aa3b2;
-  --faint: #8e97a6;
-  --accent: #34d399;
-  --ghost: #b49cff;
-  --warn: #f5a524;
-  --danger: #f87171;
+  --bg: #030812;
+  --sidebar: #030812;
+  --surface: #06101f;
+  --surface-sunken: #040b17;
+  --hover: #0b1a30;
+  --line: #1a2d4d;
+  --line-soft: #12213a;
+  --line-strong: #27406b;
+  --text: #ddebff;
+  --muted: #93a8c8;
+  --faint: #8197b8;
+  --dim: #3b5378;
+
+  --accent: #7df9ff; /* actif, OK */
+  --accent-2: #5c8bff; /* bleu du logo */
+  --action: #ff8a1f; /* orange de l'œil : actions principales */
+  --on-action: #1a0b00;
+  --ghost: #a9b8ff; /* mode Fantôme */
+  --warn: #ffd166;
+  --danger: #ff5c7a;
+
+  /* Coins coupés, comme l'octogone du logo */
+  --cut: 14px;
 
   --font-display: 'Space Grotesk', system-ui, sans-serif;
-  --font-body: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-body: 'IBM Plex Mono', ui-monospace, monospace;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
 
   color-scheme: dark;
@@ -37,6 +47,17 @@ body {
   overflow: hidden;
 }
 
+/* Fines lignes de balayage, façon écran */
+body {
+  background-image: repeating-linear-gradient(
+    0deg,
+    rgba(125, 249, 255, 0.035) 0px,
+    rgba(125, 249, 255, 0.035) 1px,
+    transparent 1px,
+    transparent 4px
+  );
+}
+
 #app {
   height: 100%;
 }
@@ -48,7 +69,8 @@ button {
 button:disabled {
   cursor: not-allowed;
 }
-button:focus-visible {
+button:focus-visible,
+a:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
@@ -60,6 +82,16 @@ button:focus-visible {
   background: var(--line-strong);
   border-radius: 10px;
   border: 3px solid var(--bg);
+}
+
+/* Coins biseautés (WebView2 récent) ; sinon, simples coins arrondis. */
+.bevel,
+.card,
+.btn-primary,
+.btn-ghost,
+.log,
+.banner {
+  corner-shape: bevel;
 }
 
 /* ---------- Briques communes aux pages ---------- */
@@ -84,12 +116,20 @@ button:focus-visible {
   font-family: var(--font-display);
   font-size: 28px;
   font-weight: 700;
+  color: #ffffff;
+}
+.page-head h1::before {
+  content: '>';
+  margin-right: 10px;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  color: var(--action);
 }
 .page-intro {
   margin: -8px 0 0;
   color: var(--muted);
-  font-size: 14px;
-  line-height: 1.5;
+  font-size: 13px;
+  line-height: 1.6;
   max-width: 640px;
 }
 
@@ -108,7 +148,7 @@ button:focus-visible {
 .card {
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: var(--cut) 0;
   padding: 18px;
   display: flex;
   flex-direction: column;
@@ -122,25 +162,29 @@ button:focus-visible {
 }
 .card h2 {
   margin: 0;
-  font-family: var(--font-display);
-  font-size: 15px;
-  font-weight: 600;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--faint);
 }
 .card-text {
   margin: 0;
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.6;
   color: var(--muted);
 }
 .eyebrow {
   font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 0.8px;
+  letter-spacing: 2px;
   color: var(--faint);
 }
 .hint {
   margin: 0;
   font-size: 12px;
+  line-height: 1.5;
   color: var(--faint);
 }
 .error {
@@ -158,12 +202,12 @@ button:focus-visible {
 .banner {
   margin: 0;
   padding: 12px 14px;
-  border-radius: 12px;
-  background: rgba(245, 165, 36, 0.12);
-  border: 1px solid rgba(245, 165, 36, 0.4);
-  color: #f8c46b;
+  border-radius: 10px 0;
+  background: color-mix(in srgb, var(--warn) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warn) 45%, transparent);
+  color: var(--warn);
   font-size: 13px;
-  line-height: 1.45;
+  line-height: 1.5;
 }
 
 /* Boutons */
@@ -176,14 +220,18 @@ button:focus-visible {
 .btn-ghost {
   min-height: 44px;
   padding: 0 16px;
-  border-radius: 10px;
-  font-size: 14px;
+  border-radius: 10px 0;
+  font-family: var(--font-mono);
+  font-size: 13px;
   font-weight: 600;
 }
 .btn-primary {
-  background: var(--accent);
-  border: 1px solid var(--accent);
-  color: #08130e;
+  background: var(--action);
+  border: 1px solid var(--action);
+  color: var(--on-action);
+}
+.btn-primary:hover:not(:disabled) {
+  background: #ff9d42;
 }
 .btn-ghost {
   background: transparent;
@@ -192,6 +240,7 @@ button:focus-visible {
 }
 .btn-ghost:hover:not(:disabled) {
   background: var(--hover);
+  border-color: var(--accent-2);
 }
 .btn-primary:disabled,
 .btn-ghost:disabled {
@@ -205,21 +254,28 @@ button:focus-visible {
 .pill,
 .chip {
   flex: none;
-  font-size: 12px;
-  font-weight: 600;
-  padding: 5px 10px;
-  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  padding: 4px 9px;
+  border-radius: 6px 0;
+  corner-shape: bevel;
   background: var(--line-soft);
   color: var(--muted);
 }
 .pill.on,
 .chip.ok {
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
   color: var(--accent);
 }
 .chip.fail {
-  background: rgba(248, 113, 113, 0.14);
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
   color: var(--danger);
+}
+.chip.warn {
+  background: color-mix(in srgb, var(--warn) 14%, transparent);
+  color: var(--warn);
 }
 
 /* Lignes de liste */
@@ -242,7 +298,7 @@ button:focus-visible {
   min-width: 0;
 }
 .row-name {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
 }
 .row-detail {
@@ -257,7 +313,7 @@ button:focus-visible {
   list-style: none;
   background: var(--surface-sunken);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 10px 0;
   font-family: var(--font-mono);
   font-size: 12px;
   display: flex;
@@ -276,4 +332,11 @@ button:focus-visible {
 }
 .log li.fail span {
   color: var(--danger);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
 }

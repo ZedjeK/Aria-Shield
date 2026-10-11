@@ -135,7 +135,8 @@
     width: 52px;
     height: 52px;
     flex: none;
-    border-radius: 14px;
+    border-radius: 12px 0;
+    corner-shape: bevel;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -145,12 +146,14 @@
   .cta {
     width: 100%;
     min-height: 52px;
-    border-radius: 14px;
-    font-size: 16px;
+    border-radius: 12px 0;
+    corner-shape: bevel;
+    font-family: var(--font-mono);
+    font-size: 15px;
     font-weight: 600;
     background: var(--ghost);
     border: 1.5px solid var(--ghost);
-    color: #160f2b;
+    color: #0b0f2b;
   }
   .cta:disabled {
     opacity: 0.45;
@@ -185,7 +188,8 @@
   }
   .notice {
     padding: 14px;
-    border-radius: 12px;
+    border-radius: 12px 0;
+    corner-shape: bevel;
     border: 1px solid color-mix(in srgb, var(--ghost) 45%, transparent);
     background: color-mix(in srgb, var(--ghost) 8%, transparent);
     display: flex;
@@ -193,8 +197,8 @@
     gap: 8px;
   }
   .notice.warn {
-    border-color: rgba(245, 165, 36, 0.45);
-    background: rgba(245, 165, 36, 0.08);
+    border-color: color-mix(in srgb, var(--warn) 45%, transparent);
+    background: color-mix(in srgb, var(--warn) 8%, transparent);
   }
   .notice .actions {
     flex-direction: column;
@@ -203,9 +207,5 @@
     margin: 0;
     font-weight: 600;
     font-size: 14px;
-  }
-  :global(.chip.warn) {
-    background: rgba(245, 165, 36, 0.14);
-    color: var(--warn);
   }
 </style>

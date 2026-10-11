@@ -135,9 +135,3 @@
   </section>
 </div>
 
-<style>
-  :global(.chip.warn) {
-    background: rgba(245, 165, 36, 0.14);
-    color: var(--warn);
-  }
-</style>
