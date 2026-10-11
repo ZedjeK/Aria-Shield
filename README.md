@@ -1,9 +1,18 @@
-# Aria Shield
+<p align="center">
+  <img src="docs/logo.png" width="160" alt="Logo d'Aria Shield : un A néon glitché avec un œil orange">
+</p>
 
-Un logiciel Windows portable pour naviguer discrètement, en un clic : résolveur DNS à toi, VPN avec kill switch, et Tor Browser.
-Rien à installer : tout tient dans un seul exe.
+<h1 align="center">Aria Shield</h1>
 
-> Version 0.8 · Windows 10/11 x64 · licence MIT
+<p align="center">
+  Un logiciel Windows portable pour naviguer discrètement, en un clic :<br>
+  résolveur DNS à toi, VPN avec kill switch, et Tor Browser.<br>
+  Rien à installer : tout tient dans un seul exe.
+</p>
+
+<p align="center">
+  <a href="../../releases/latest"><b>Télécharger la dernière version</b></a> · v0.8 · Windows 10/11 x64 · licence MIT
+</p>
 
 ## Ce qu'il fait
 
@@ -36,7 +45,16 @@ Depuis la v0.7, l'ancien dossier `AriaShield-data` des versions précédentes es
 
 Si tu lances Aria depuis un compte standard en saisissant le mot de passe d'un autre compte administrateur, ses données iront dans le dossier `%LOCALAPPDATA%` de ce compte administrateur.
 
-Pour le mode Discret, il te faut un fournisseur VPN qui fournit des configurations WireGuard (Proton VPN, gratuit compris, Mullvad, IVPN…). Tu recopies les valeurs de son fichier `.conf` dans la page VPN.
+## Premiers pas
+
+1. **VPN** : recopie les valeurs du fichier `.conf` WireGuard de ton fournisseur (Proton VPN, gratuit compris, Mullvad, IVPN…).
+2. **Accueil** : mode Discret, puis « activer la protection ». Résolveur, DNS de Windows, tunnel et kill switch démarrent ensemble. Quand rien ne te protège, le logo de la fenêtre est délavé.
+3. **Mode Fantôme** : lance Tor Browser depuis Aria pour naviguer anonymement. Aria l'installe au premier lancement et vérifie ses mises à jour.
+4. **Tests** : vérifie qu'aucune fuite ne passe, et repère les navigateurs dont le « DNS sécurisé » contournerait Aria.
+
+Juste un DNS sans blocage, sans VPN ? Sur la page Résolveur DNS, démarre le résolveur puis active « Utiliser pour tout Windows ». Ton IP reste alors visible.
+
+Pour revenir à la normale à tout moment : « restaurer --tout », en bas de la barre latérale.
 
 ## Sécurité
 
@@ -70,7 +88,7 @@ Prérequis : [Go](https://go.dev/dl/) 1.25 ou plus et [Node.js](https://nodejs.o
 powershell -ExecutionPolicy Bypass -File .\build.ps1
 ```
 
-Le script télécharge Tor Browser 15.0.24 sur dist.torproject.org (trop lourd pour le dépôt), installe le CLI [Wails v3](https://v3.wails.io/) si besoin, génère le projet dans `.work\`, y applique `src\` et produit `Aria-Shield.exe` à la racine.
+Le script télécharge Tor Browser 15.0.24 sur dist.torproject.org (trop lourd pour le dépôt), installe le CLI [Wails v3](https://v3.wails.io/) si besoin, génère le projet dans `.work\`, y applique `src\` et produit `Aria-Shield.exe` à la racine. L'icône fournie dans `src/build/windows/icon.ico` est utilisée telle quelle.
 
 ## Structure
 
@@ -89,8 +107,8 @@ src/
 │   ├── torbrowser/             # Tor Browser embarqué, mises à jour signées
 │   ├── browsers/               # détection du DNS sécurisé des navigateurs
 │   └── sysx/                   # commandes sans console, droits admin
-├── frontend/src/               # interface Svelte (polices embarquées)
-└── build/windows/              # manifest : requireAdministrator
+├── frontend/src/               # interface Svelte (polices embarquées, logo en SVG)
+└── build/                      # icône, propriétés de l'exe, manifest administrateur
 ```
 
 ## Licence
