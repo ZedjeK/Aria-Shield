@@ -3,37 +3,26 @@
 package vpn
 
 import (
-	"crypto/sha256"
-	_ "embed"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"net"
 	"net/netip"
-	"os"
-	"path/filepath"
 	"strconv"
 	"sync"
 	"time"
+	"unsafe"
 
 	"golang.org/x/sys/windows"
 	"golang.zx2c4.com/wireguard/windows/conf"
-	"golang.zx2c4.com/wireguard/windows/driver"
 	"golang.zx2c4.com/wireguard/windows/tunnel/winipcfg"
 
 	"aria-shield/internal/killswitch"
+	driver "aria-shield/internal/wgnt"
 )
 
-// Pilote officiel WireGuardNT 1.1 (wireguard-nt-1.1.zip de download.wireguard.com),
-// signé « WireGuard LLC ». Il doit se trouver à côté de l'exe pour être chargé.
-//
-//go:embed assets/wireguard.dll
-var wireguardDLL []byte
-
 const (
-	wireguardDLLSHA256 = "b1b85e072c45d81358be29d94c599dc76652f912be8c0f0a41e2d5d89a6461d3"
-	tunnelType         = "Aria Shield"
-	tunnelMTU          = 1420
+	tunnelType = "Aria Shield"
+	tunnelMTU  = 1420
 )
 
 // GUID fixe : Windows reconnaît la carte « Aria » d'une session à l'autre.
@@ -51,39 +40,6 @@ type Tunnel struct {
 
 // NewTunnel prépare le pilote du tunnel (rien n'est lancé).
 func NewTunnel() *Tunnel { return &Tunnel{} }
-
-// ensureDLL dépose wireguard.dll à côté de l'exe (seul endroit où Windows le cherche).
-func ensureDLL() error {
-	exe, err := os.Executable()
-	if err != nil {
-		return err
-	}
-	dst := filepath.Join(filepath.Dir(exe), "wireguard.dll")
-	if sum, err := fileSum(dst); err == nil && sum == wireguardDLLSHA256 {
-		return nil
-	}
-	if sum := sha256.Sum256(wireguardDLL); hex.EncodeToString(sum[:]) != wireguardDLLSHA256 {
-		return errors.New("wireguard.dll embarqué corrompu")
-	}
-	tmp := dst + ".tmp"
-	if err := os.WriteFile(tmp, wireguardDLL, 0o644); err != nil {
-		return fmt.Errorf("impossible d'écrire wireguard.dll à côté de l'exe : %w", err)
-	}
-	if err := os.Rename(tmp, dst); err != nil {
-		os.Remove(tmp)
-		return fmt.Errorf("wireguard.dll en cours d'utilisation ou protégé : %w", err)
-	}
-	return nil
-}
-
-func fileSum(path string) (string, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return "", err
-	}
-	sum := sha256.Sum256(data)
-	return hex.EncodeToString(sum[:]), nil
-}
 
 // buildConfig traduit le profil en configuration WireGuard, tunnel complet imposé.
 func buildConfig(p Profile) (*conf.Config, error) {
@@ -145,9 +101,6 @@ func (t *Tunnel) Up(p Profile, full bool, dns4, dns6 []netip.Addr) (err error) {
 			t.downLocked()
 		}
 	}()
-	if err := ensureDLL(); err != nil {
-		return err
-	}
 	cfg, err := buildConfig(p)
 	if err != nil {
 		return err
@@ -171,7 +124,7 @@ func (t *Tunnel) Up(p Profile, full bool, dns4, dns6 []netip.Addr) (err error) {
 		}
 	}()
 
-	drv, size := cfg.ToDriverConfiguration()
+	drv, size := toDriverConfiguration(cfg)
 	if err = adapter.SetConfiguration(drv, size); err != nil {
 		return fmt.Errorf("configuration du tunnel refusée : %w", err)
 	}
@@ -318,4 +271,53 @@ func (t *Tunnel) WaitHandshake(timeout time.Duration) bool {
 		time.Sleep(300 * time.Millisecond)
 	}
 	return false
+}
+
+// toDriverConfiguration traduit la configuration pour WireGuardNT
+// (reprise de conf.ToDriverConfiguration, avec les types du paquet wgnt).
+func toDriverConfiguration(config *conf.Config) (*driver.Interface, uint32) {
+	preallocation := unsafe.Sizeof(driver.Interface{}) + uintptr(len(config.Peers))*unsafe.Sizeof(driver.Peer{})
+	for i := range config.Peers {
+		preallocation += uintptr(len(config.Peers[i].AllowedIPs)) * unsafe.Sizeof(driver.AllowedIP{})
+	}
+	var c driver.ConfigBuilder
+	c.Preallocate(uint32(preallocation))
+	c.AppendInterface(&driver.Interface{
+		Flags:      driver.InterfaceHasPrivateKey | driver.InterfaceHasListenPort,
+		ListenPort: config.Interface.ListenPort,
+		PrivateKey: config.Interface.PrivateKey,
+		PeerCount:  uint32(len(config.Peers)),
+	})
+	for i := range config.Peers {
+		flags := driver.PeerHasPublicKey | driver.PeerHasPersistentKeepalive
+		if !config.Peers[i].PresharedKey.IsZero() {
+			flags |= driver.PeerHasPresharedKey
+		}
+		var endpoint winipcfg.RawSockaddrInet
+		if !config.Peers[i].Endpoint.IsEmpty() {
+			if addr, err := netip.ParseAddr(config.Peers[i].Endpoint.Host); err == nil {
+				flags |= driver.PeerHasEndpoint
+				endpoint.SetAddrPort(netip.AddrPortFrom(addr, config.Peers[i].Endpoint.Port))
+			}
+		}
+		c.AppendPeer(&driver.Peer{
+			Flags:               flags,
+			PublicKey:           config.Peers[i].PublicKey,
+			PresharedKey:        config.Peers[i].PresharedKey,
+			PersistentKeepalive: config.Peers[i].PersistentKeepalive,
+			Endpoint:            endpoint,
+			AllowedIPsCount:     uint32(len(config.Peers[i].AllowedIPs)),
+		})
+		for j := range config.Peers[i].AllowedIPs {
+			a := &driver.AllowedIP{Cidr: uint8(config.Peers[i].AllowedIPs[j].Bits())}
+			copy(a.Address[:], config.Peers[i].AllowedIPs[j].Addr().AsSlice())
+			if config.Peers[i].AllowedIPs[j].Addr().Is4() {
+				a.AddressFamily = windows.AF_INET
+			} else if config.Peers[i].AllowedIPs[j].Addr().Is6() {
+				a.AddressFamily = windows.AF_INET6
+			}
+			c.AppendAllowedIP(a)
+		}
+	}
+	return c.Interface()
 }

@@ -123,7 +123,7 @@
       <p class="card-text">Le détail de la prochaine action s'affichera ici.</p>
     {/if}
     {#if app.status?.dataDir}
-      <p class="path">Dossier de travail : {app.status.dataDir}</p>
+      <p class="path">Dossier système (réservé aux administrateurs) : {app.status.dataDir}</p>
     {/if}
   </section>
 </div>

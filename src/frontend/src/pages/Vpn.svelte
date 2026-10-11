@@ -145,6 +145,9 @@
         {#if tunnel.up}
           <p class="hint">Désactive la protection pour modifier ou supprimer le profil.</p>
         {/if}
+        {#if app.status?.userDir}
+          <p class="path">Profil chiffré dans : {app.status.userDir}</p>
+        {/if}
       {/if}
     </section>
 

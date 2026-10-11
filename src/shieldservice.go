@@ -13,6 +13,7 @@ import (
 	"aria-shield/internal/browsers"
 	"aria-shield/internal/dnsengine"
 	"aria-shield/internal/leak"
+	"aria-shield/internal/paths"
 	"aria-shield/internal/sysdns"
 	"aria-shield/internal/sysx"
 	"aria-shield/internal/torbrowser"
@@ -30,6 +31,11 @@ type ShieldService struct {
 	tun   *vpn.Tunnel
 	tor   *torbrowser.Manager
 
+	userDir  string // %LOCALAPPDATA%\AriaShield
+	sysDir   string // %PROGRAMDATA%\AriaShield (réservé aux administrateurs)
+	noticeMu sync.Mutex
+	notice   string // message affiché une fois (migration, erreur de dossier)
+
 	torMu     sync.Mutex
 	torUpdate torbrowser.UpdateInfo // dernière vérification des mises à jour
 
@@ -41,12 +47,40 @@ type ShieldService struct {
 
 // NewShieldService prépare le service et ses moteurs (rien n'est lancé).
 func NewShieldService() *ShieldService {
-	s := &ShieldService{dns: dnsengine.New(), tun: vpn.NewTunnel()}
-	dir := s.dns.DataDir()
-	s.sys = sysdns.New(dir)
+	s := &ShieldService{tun: vpn.NewTunnel()}
+
+	var errs []string
+	userDir, err := paths.UserDir()
+	if err != nil {
+		errs = append(errs, "dossier utilisateur : "+err.Error())
+	}
+	sysDir, err := paths.SystemDir()
+	if err != nil {
+		errs = append(errs, "dossier système non verrouillé : "+err.Error())
+	}
+	s.userDir, s.sysDir = userDir, sysDir
+
+	// Les versions jusqu'à la v0.6.1 rangeaient tout à côté de l'exe.
+	if legacy := paths.LegacyDir(); legacy != "" {
+		moved, err := paths.Migrate(legacy, userDir, sysDir)
+		switch {
+		case err != nil:
+			errs = append(errs, "déplacement de l'ancien dossier AriaShield-data : "+err.Error())
+		case len(moved) > 0:
+			s.notice = "Tes données ont été déplacées : profil VPN et Tor Browser dans " + userDir +
+				", fichiers système dans " + sysDir + ". L'ancien dossier AriaShield-data a été supprimé."
+		}
+	}
+	paths.CleanOldDLL()
+	if len(errs) > 0 {
+		s.notice = "Attention : " + strings.Join(errs, " ; ")
+	}
+
+	s.dns = dnsengine.New(sysDir)
+	s.sys = sysdns.New(sysDir)
 	s.sys.Exclude(vpn.AdapterName) // la carte VPN est configurée par le tunnel lui-même
-	s.store = vpn.NewStore(dir)
-	s.tor = torbrowser.New(dir)
+	s.store = vpn.NewStore(userDir)
+	s.tor = torbrowser.New(userDir, sysDir)
 
 	// Filets de sécurité si Unbound s'arrête tout seul.
 	s.dns.OnUnexpectedExit(func() {
@@ -82,6 +116,7 @@ type Status struct {
 	Protected  bool          `json:"protected"`
 	Event      string        `json:"event"`
 	DataDir    string        `json:"dataDir"`
+	UserDir    string        `json:"userDir"`
 	VPN        vpn.View      `json:"vpn"`
 	Tunnel     vpn.Stats     `json:"tunnel"`
 	Leak       *leak.Verdict `json:"leak"`
@@ -174,8 +209,9 @@ func (s *ShieldService) Status() Status {
 		DNSRunning: running,
 		SystemDNS:  s.sys.Enabled(),
 		Protected:  tun.Full,
-		Event:      s.sys.LastEvent(),
-		DataDir:    s.dns.DataDir(),
+		Event:      s.event(),
+		DataDir:    s.sysDir,
+		UserDir:    s.userDir,
 		VPN:        profile.View(),
 		Tunnel:     tun,
 		Leak:       lastLeak,
@@ -594,4 +630,22 @@ func (s *ShieldService) TorLaunch() SystemResult {
 		note += ", à travers le VPN"
 	}
 	return SystemResult{Steps: []Step{{Label: "Tor Browser lancé", OK: true, Note: note}}}
+}
+
+// event renvoie le message à afficher : incident DNS en priorité, sinon la note de démarrage.
+func (s *ShieldService) event() string {
+	if e := s.sys.LastEvent(); e != "" {
+		return e
+	}
+	s.noticeMu.Lock()
+	defer s.noticeMu.Unlock()
+	return s.notice
+}
+
+// DismissNotice masque le message affiché (incident DNS ou note de démarrage).
+func (s *ShieldService) DismissNotice() {
+	s.sys.ClearEvent()
+	s.noticeMu.Lock()
+	s.notice = ""
+	s.noticeMu.Unlock()
 }

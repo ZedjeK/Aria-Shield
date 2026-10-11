@@ -48,7 +48,6 @@ const (
 const (
 	listenAddr   = "127.0.0.1:53"
 	listenAddr6  = "[::1]:53"
-	dataDirName  = "AriaShield-data"
 	startTimeout = 12 * time.Second
 	probeTimeout = 3 * time.Second
 	testDomain   = "example.com"
@@ -95,53 +94,14 @@ func (e *Engine) IPv6() bool {
 	return e.ipv6 && e.runningLocked()
 }
 
-// New crée le moteur ; rien n'est lancé tant que Start n'est pas appelé.
-func New() *Engine { return &Engine{} }
+// New crée le moteur ; Unbound vivra dans dir, qui doit être réservé aux
+// administrateurs (Aria l'exécute avec ses droits). Rien n'est lancé avant Start.
+func New(dir string) *Engine { return &Engine{dataDir: dir} }
 
-// DataDir renvoie le dossier de travail : à côté de l'exe si possible,
-// sinon dans %LOCALAPPDATA%.
-func (e *Engine) DataDir() string {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	return e.dataDirLocked()
-}
+// DataDir renvoie le dossier d'Unbound.
+func (e *Engine) DataDir() string { return e.dataDir }
 
-func (e *Engine) dataDirLocked() string {
-	if e.dataDir != "" {
-		return e.dataDir
-	}
-	var candidates []string
-	if exe, err := os.Executable(); err == nil {
-		candidates = append(candidates, filepath.Join(filepath.Dir(exe), dataDirName))
-	}
-	if local := os.Getenv("LOCALAPPDATA"); local != "" {
-		candidates = append(candidates, filepath.Join(local, "AriaShield"))
-	}
-	candidates = append(candidates, filepath.Join(os.TempDir(), "AriaShield"))
-
-	for _, dir := range candidates {
-		if writable(dir) {
-			e.dataDir = dir
-			return dir
-		}
-	}
-	e.dataDir = candidates[len(candidates)-1]
-	return e.dataDir
-}
-
-func writable(dir string) bool {
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return false
-	}
-	f, err := os.CreateTemp(dir, ".probe-*")
-	if err != nil {
-		return false
-	}
-	name := f.Name()
-	f.Close()
-	os.Remove(name)
-	return true
-}
+func (e *Engine) dataDirLocked() string { return e.dataDir }
 
 // Running indique si unbound.exe tourne.
 func (e *Engine) Running() bool {
@@ -194,15 +154,13 @@ func (e *Engine) prepare(add func(string, bool, string)) (exePath, confPath stri
 	add("Dossier de travail", true, dir)
 
 	exePath = filepath.Join(dir, "unbound.exe")
-	if fileSHA256(exePath) != unboundSHA256 {
-		if err := extractUnbound(exePath); err != nil {
-			add("Extraction d'Unbound "+Version, false, err.Error())
-			return "", "", err
-		}
-		add("Extraction d'Unbound "+Version, true, "empreinte vérifiée")
-	} else {
-		add("Extraction d'Unbound "+Version, true, "déjà présent et intact")
+	// Toujours réextrait : aucun fichier laissé sur le disque n'est réutilisé
+	// pour un lancement en administrateur.
+	if err := extractUnbound(exePath); err != nil {
+		add("Extraction d'Unbound "+Version, false, err.Error())
+		return "", "", err
 	}
+	add("Extraction d'Unbound "+Version, true, "empreinte vérifiée")
 
 	// Unbound met lui-même la clé à jour (RFC 5011) : on ne l'écrase jamais.
 	keyPath := filepath.Join(dir, "root.key")

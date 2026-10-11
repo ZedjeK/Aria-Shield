@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte'
   import Icon from './lib/Icon.svelte'
-  import { app, refresh, startPolling, restoreAll } from './lib/state.svelte.js'
+  import { app, refresh, startPolling, restoreAll, dismissNotice } from './lib/state.svelte.js'
   import Home from './pages/Home.svelte'
   import Resolver from './pages/Resolver.svelte'
   import Tests from './pages/Tests.svelte'
@@ -72,7 +72,7 @@
         <span class="nav-icon"><Icon name="restore" /></span>
         <span class="label">Tout restaurer</span>
       </button>
-      <span class="version label">v0.6.1</span>
+      <span class="version label">v0.7</span>
     </div>
   </nav>
 
@@ -84,7 +84,10 @@
       <p class="banner" role="alert">Impossible de lire l'état du système : {app.loadError}</p>
     {/if}
     {#if app.status?.event}
-      <p class="banner info" role="status">{app.status.event}</p>
+      <div class="banner info" role="status">
+        <span>{app.status.event}</span>
+        <button class="dismiss" aria-label="Masquer ce message" onclick={dismissNotice}>×</button>
+      </div>
     {/if}
 
     {#if app.page === 'home'}
@@ -198,9 +201,27 @@
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent);
   }
   .banner.info {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
     background: color-mix(in srgb, var(--accent) 10%, transparent);
     border-color: color-mix(in srgb, var(--accent) 40%, transparent);
     color: #9be8c6;
+  }
+  .dismiss {
+    flex: none;
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: inherit;
+    font-size: 18px;
+    line-height: 1;
+  }
+  .dismiss:hover {
+    background: rgba(255, 255, 255, 0.08);
   }
   .label {
     white-space: nowrap;

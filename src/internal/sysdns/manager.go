@@ -100,6 +100,13 @@ func (m *Manager) Enabled() bool {
 	return m.enabled
 }
 
+// ClearEvent efface le dernier événement une fois que l'utilisateur l'a lu.
+func (m *Manager) ClearEvent() {
+	m.mu.Lock()
+	m.event = ""
+	m.mu.Unlock()
+}
+
 // LastEvent renvoie le dernier événement notable (restauration automatique…).
 func (m *Manager) LastEvent() string {
 	m.mu.Lock()

@@ -26,6 +26,13 @@ export async function loadAdapters() {
 
 const message = (err) => String(err?.message ?? err)
 
+export async function dismissNotice() {
+  try {
+    await ShieldService.DismissNotice()
+  } catch {}
+  refresh()
+}
+
 export async function refresh() {
   try {
     app.status = await ShieldService.Status()

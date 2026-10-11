@@ -63,16 +63,18 @@ type UpdateInfo struct {
 
 // Manager pilote le dossier Tor Browser d'Aria.
 type Manager struct {
-	dir string
-	mu  sync.Mutex // une seule installation ou mise à jour à la fois
+	dir  string     // Tor Browser, dans les données de l'utilisateur
+	work string     // installeurs téléchargés, exécutés en admin : dossier réservé aux administrateurs
+	mu   sync.Mutex // une seule installation ou mise à jour à la fois
 
 	pmu      sync.Mutex
 	progress Progress
 }
 
-// New prépare le gestionnaire ; Tor Browser vivra dans dataDir\TorBrowser.
-func New(dataDir string) *Manager {
-	return &Manager{dir: filepath.Join(dataDir, dirName)}
+// New prépare le gestionnaire : Tor Browser vivra dans userDir\TorBrowser, et les
+// installeurs (lancés en administrateur) passeront par workDir, réservé aux admins.
+func New(userDir, workDir string) *Manager {
+	return &Manager{dir: filepath.Join(userDir, dirName), work: workDir}
 }
 
 func (m *Manager) setProgress(phase string, done, total int64) {
@@ -191,7 +193,7 @@ func (m *Manager) EnsureInstalled() error {
 	if err := os.MkdirAll(filepath.Dir(m.dir), 0o755); err != nil {
 		return err
 	}
-	tmp := filepath.Join(filepath.Dir(m.dir), "tor-browser-setup.exe")
+	tmp := filepath.Join(m.work, "tor-browser-setup.exe")
 	m.setProgress("Vérification de la signature", 0, 0)
 	if err := Verify(bytes.NewReader(embeddedInstaller), embeddedSig); err != nil {
 		return fmt.Errorf("Tor Browser embarqué : %w", err)
@@ -279,7 +281,7 @@ func (m *Manager) Update(info UpdateInfo) error {
 	if running(m.dir) {
 		return errors.New("ferme Tor Browser avant la mise à jour")
 	}
-	base := filepath.Dir(m.dir)
+	base := m.work
 	bin := filepath.Join(base, "tor-browser-update.exe")
 	sigPath := bin + ".asc"
 	defer os.Remove(bin)
