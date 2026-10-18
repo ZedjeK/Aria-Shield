@@ -75,6 +75,8 @@ func listAdapters() ([]Adapter, error) {
 	return adapters, nil
 }
 
+// psList met en forme une liste PowerShell. Ne lui passer que des adresses
+// validées par canonicalAddrs : le doublement de ' ne suffit pas à lui seul.
 func psList(items []string) string {
 	quoted := make([]string, len(items))
 	for i, s := range items {
@@ -103,7 +105,16 @@ func pointToLoopback(index int, ipv6 bool) error {
 
 // restoreAdapter remet une carte comme sur la photo : DNS automatique, ou serveurs fixes.
 func restoreAdapter(a Adapter) (string, error) {
-	static := append(append([]string{}, a.StaticV4...), a.StaticV6...)
+	// La photo vient d'un fichier : rien n'en part vers PowerShell ou le registre sans validation.
+	v4, err := canonicalAddrs(a.StaticV4)
+	if err != nil {
+		return "", err
+	}
+	v6, err := canonicalAddrs(a.StaticV6)
+	if err != nil {
+		return "", err
+	}
+	static := append(append([]string{}, v4...), v6...)
 	script := fmt.Sprintf(`Set-DnsClientServerAddress -InterfaceIndex %d -ResetServerAddresses -ErrorAction Stop`, a.Index)
 	if len(static) > 0 {
 		script += fmt.Sprintf("\nSet-DnsClientServerAddress -InterfaceIndex %d -ServerAddresses %s -ErrorAction Stop", a.Index, psList(static))
@@ -120,10 +131,13 @@ func restoreAdapter(a Adapter) (string, error) {
 	if a.GUID == "" {
 		return "", errors.New("carte introuvable")
 	}
-	if err := writeNameServer(tcpip4Key+a.GUID, strings.Join(a.StaticV4, ",")); err != nil {
+	if !validGUID(a.GUID) {
+		return "", fmt.Errorf("identifiant de carte invalide : %q", a.GUID)
+	}
+	if err := writeNameServer(tcpip4Key+a.GUID, strings.Join(v4, ",")); err != nil {
 		return "", err
 	}
-	if err := writeNameServer(tcpip6Key+a.GUID, strings.Join(a.StaticV6, ",")); err != nil {
+	if err := writeNameServer(tcpip6Key+a.GUID, strings.Join(v6, ",")); err != nil {
 		return "", err
 	}
 	return note + " (via le registre)", nil
