@@ -147,6 +147,11 @@ func ipv6Loopback() bool {
 // prepare extrait unbound.exe (si absent ou altéré), la clé racine et la config.
 func (e *Engine) prepare(add func(string, bool, string)) (exePath, confPath string, err error) {
 	dir := e.dataDirLocked()
+	if dir == "" {
+		err := errors.New("dossier système non verrouillé : Unbound n'est pas lancé en administrateur depuis un dossier modifiable")
+		add("Dossier de travail", false, err.Error())
+		return "", "", err
+	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		add("Dossier de travail", false, err.Error())
 		return "", "", err

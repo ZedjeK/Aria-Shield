@@ -5,4 +5,9 @@ package paths
 import "os"
 
 // Hors Windows (développement uniquement) : dossier réservé au propriétaire.
-func lockDown(dir string) error { return os.Chmod(dir, 0o700) }
+func prepareSystemDir(dir string) (string, error) {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return "", err
+	}
+	return "", os.Chmod(dir, 0o700)
+}

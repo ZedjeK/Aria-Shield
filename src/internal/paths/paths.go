@@ -29,13 +29,12 @@ func UserDir() (string, error) {
 }
 
 // SystemDir renvoie %PROGRAMDATA%\AriaShield, créé si besoin et verrouillé
-// (écriture réservée aux administrateurs et au système).
-func SystemDir() (string, error) {
-	dir := filepath.Join(envOr("ProgramData", filepath.Join(os.TempDir(), "ProgramData")), appDir)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return dir, err
-	}
-	return dir, lockDown(dir)
+// (écriture réservée aux administrateurs et au système). aside est le nom d'un
+// dossier suspect, qu'Aria n'avait pas créé, mis de côté à la place ("" sinon).
+func SystemDir() (dir, aside string, err error) {
+	dir = filepath.Join(envOr("ProgramData", filepath.Join(os.TempDir(), "ProgramData")), appDir)
+	aside, err = prepareSystemDir(dir)
+	return dir, aside, err
 }
 
 // LegacyDir renvoie l'ancien dossier à côté de l'exe, s'il existe.

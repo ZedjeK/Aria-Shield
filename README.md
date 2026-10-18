@@ -37,7 +37,7 @@ Aria ne dépose rien à côté de l'exe. Elle range ses fichiers dans deux dossi
 | `%LOCALAPPDATA%\AriaShield` | Tes données : profil VPN chiffré, Tor Browser et ses favoris | Ton compte |
 | `%PROGRAMDATA%\AriaShield` | Ce qu'Aria exécute en administrateur (Unbound, installeurs de Tor Browser) et la photo de ton DNS d'origine | Administrateurs et système uniquement |
 
-Le second est verrouillé pour qu'aucun programme sans droits admin ne puisse y glisser un faux exécutable qu'Aria lancerait ensuite.
+Le second est créé déjà verrouillé, pour qu'aucun programme sans droits admin ne puisse y glisser un faux exécutable ou une DLL qu'Aria lancerait ensuite. S'il existe déjà sans avoir été créé par Aria (propriétaire inattendu, ou lien vers un autre dossier), il est mis de côté sous le nom `AriaShield.suspect-<date>` et remplacé par un dossier neuf ; Aria te prévient au lancement. Si le verrouillage échoue, Aria refuse de lancer Unbound.
 
 **Pour tout désinstaller** : clique sur « restaurer --tout », ferme Aria, puis supprime l'exe et ces deux dossiers (le second demande une confirmation administrateur).
 

@@ -54,9 +54,14 @@ func NewShieldService() *ShieldService {
 	if err != nil {
 		errs = append(errs, "dossier utilisateur : "+err.Error())
 	}
-	sysDir, err := paths.SystemDir()
+	sysDir, aside, err := paths.SystemDir()
+	sysLocked := err == nil
 	if err != nil {
-		errs = append(errs, "dossier système non verrouillé : "+err.Error())
+		errs = append(errs, "dossier système non verrouillé, Unbound ne sera pas lancé : "+err.Error())
+	}
+	if aside != "" {
+		errs = append(errs, "un dossier AriaShield qu'Aria n'avait pas créé (piège possible) a été écarté dans "+
+			aside+" : examine-le avec un antivirus avant de le supprimer")
 	}
 	s.userDir, s.sysDir = userDir, sysDir
 
@@ -76,7 +81,12 @@ func NewShieldService() *ShieldService {
 		s.notice = "Attention : " + strings.Join(errs, " ; ")
 	}
 
-	s.dns = dnsengine.New(sysDir)
+	// Unbound tourne en administrateur : jamais depuis un dossier non verrouillé.
+	unboundDir := ""
+	if sysLocked {
+		unboundDir = sysDir
+	}
+	s.dns = dnsengine.New(unboundDir)
 	s.sys = sysdns.New(sysDir)
 	s.sys.Exclude(vpn.AdapterName) // la carte VPN est configurée par le tunnel lui-même
 	s.store = vpn.NewStore(userDir)
