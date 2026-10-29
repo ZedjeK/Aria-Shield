@@ -1,0 +1,11 @@
+# Les fichiers lus tels quels par Aria (config Unbound, clé racine DNSSEC) gardent
+# des fins de ligne LF, même dans un clone Windows.
+*.tmpl text eol=lf
+*.key  text eol=lf
+
+# Binaires embarqués : jamais de conversion
+*.gpg binary
+*.gz  binary
+*.dll binary
+*.ico binary
+*.png binary

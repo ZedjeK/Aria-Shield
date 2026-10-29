@@ -63,6 +63,15 @@ func TestRenderConfig(t *testing.T) {
 		t.Fatal("config mal générée")
 	}
 
+	// Modèle en CRLF (dépôt cloné sous Windows) : le repère doit être remplacé quand même.
+	saved := confTemplate
+	confTemplate = strings.ReplaceAll(saved, "\n", "\r\n")
+	crlf := RenderConfig("/d", true)
+	confTemplate = saved
+	if strings.Contains(crlf, "{{") || !strings.Contains(crlf, "interface: ::1") {
+		t.Fatalf("modèle CRLF mal rendu :\n%s", crlf)
+	}
+
 	v4 := RenderConfig("/d", false)
 	if strings.Contains(v4, "::1") || !strings.Contains(v4, "do-ip6: no") {
 		t.Fatalf("config IPv4 seule incorrecte :\n%s", v4)

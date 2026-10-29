@@ -130,7 +130,10 @@ func RenderConfig(dir string, ipv6 bool) string {
 	if ipv6 {
 		v6 = "    interface: ::1\n    access-control: ::1 allow\n    do-ip6: yes\n    prefer-ip4: yes\n"
 	}
-	conf := strings.ReplaceAll(confTemplate, "{{IPV6}}\n", v6)
+	// Fins de ligne normalisées : un dépôt cloné sous Windows peut avoir converti
+	// le modèle en CRLF, et le repère {{IPV6}} ne serait alors plus remplacé.
+	tmpl := strings.ReplaceAll(confTemplate, "\r\n", "\n")
+	conf := strings.ReplaceAll(tmpl, "{{IPV6}}\n", v6)
 	return strings.ReplaceAll(conf, "{{DIR}}", filepath.ToSlash(dir))
 }
 
