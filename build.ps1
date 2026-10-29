@@ -56,10 +56,28 @@ $TorVersion = '15.0.24'
 $TorAssets  = Join-Path $Src 'internal\torbrowser\assets'
 $TorExe     = Join-Path $TorAssets 'tor-browser-portable.exe'
 if (-not (Test-Path $TorExe)) {
-    $base = "https://dist.torproject.org/torbrowser/$TorVersion/tor-browser-windows-x86_64-portable-$TorVersion.exe"
+    # dist.torproject.org ne garde que les dernières versions ; les plus anciennes
+    # passent sur archive.torproject.org.
+    $file = "tor-browser-windows-x86_64-portable-$TorVersion.exe"
+    $bases = @(
+        "https://dist.torproject.org/torbrowser/$TorVersion",
+        "https://archive.torproject.org/tor-package-archive/torbrowser/$TorVersion"
+    )
+    $ProgressPreference = 'SilentlyContinue' # sinon Invoke-WebRequest est très lent
     Write-Host "  Téléchargement de Tor Browser $TorVersion (environ 110 Mo)"
-    Invoke-WebRequest -Uri $base -OutFile $TorExe -UseBasicParsing
-    Invoke-WebRequest -Uri "$base.asc" -OutFile "$TorExe.asc" -UseBasicParsing
+    $ok = $false
+    foreach ($base in $bases) {
+        try {
+            Invoke-WebRequest -Uri "$base/$file.asc" -OutFile "$TorExe.asc" -UseBasicParsing
+            Invoke-WebRequest -Uri "$base/$file" -OutFile $TorExe -UseBasicParsing
+            $ok = $true
+            break
+        } catch {
+            Write-Host "  Introuvable sur $base, essai suivant"
+            Remove-Item $TorExe, "$TorExe.asc" -ErrorAction SilentlyContinue
+        }
+    }
+    if (-not $ok) { throw "Impossible de télécharger Tor Browser $TorVersion." }
 } else {
     Write-Host '  Déjà présent'
 }

@@ -69,10 +69,18 @@ jobs:
           set -euo pipefail
           ver=$(sed -n "s/^\$TorVersion *= *'\([0-9.]*\)'.*/\1/p" build.ps1)
           test -n "$ver"
-          base="https://dist.torproject.org/torbrowser/$ver/tor-browser-windows-x86_64-portable-$ver.exe"
+          file="tor-browser-windows-x86_64-portable-$ver.exe"
           dir=src/internal/torbrowser/assets
-          curl -fsSL --retry 3 -o "$dir/tor-browser-portable.exe" "$base"
-          curl -fsSL --retry 3 -o "$dir/tor-browser-portable.exe.asc" "$base.asc"
+          # dist ne garde que les dernières versions, les autres passent sur archive
+          for base in "https://dist.torproject.org/torbrowser/$ver" \
+                      "https://archive.torproject.org/tor-package-archive/torbrowser/$ver"; do
+            if curl -fsSL --retry 3 -o "$dir/tor-browser-portable.exe.asc" "$base/$file.asc"; then
+              curl -fsSL --retry 3 -o "$dir/tor-browser-portable.exe" "$base/$file"
+              break
+            fi
+            echo "Introuvable sur $base, essai suivant"
+          done
+          test -s "$dir/tor-browser-portable.exe"
           export GNUPGHOME="$PWD/.gnupg-ci"
           mkdir -p "$GNUPGHOME" && chmod 700 "$GNUPGHOME"
           gpg --batch --quiet --import "$dir/torbrowser-signing-key.gpg"
