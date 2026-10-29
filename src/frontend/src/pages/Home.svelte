@@ -116,7 +116,7 @@
           <p class="hint">Tunnel, kill switch et DNS de Windows sont actifs. Tout revient comme avant à la désactivation.</p>
         {:else if !vpnReady}
           <button class="cta" onclick={() => (app.page = 'vpn')}>configurer le vpn</button>
-          <p class="hint">Saisis d'abord ton profil WireGuard sur la page VPN.</p>
+          <p class="hint">Importe d'abord le fichier .conf de ton fournisseur sur la page VPN.</p>
         {:else}
           <button class="cta" onclick={protect} disabled={app.busy || !app.status?.admin}>
             {app.busy ? 'activation… (jusqu\'à 30 s)' : 'activer la protection'}

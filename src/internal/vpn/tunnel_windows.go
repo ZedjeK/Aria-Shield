@@ -56,6 +56,14 @@ func buildConfig(p Profile) (*conf.Config, error) {
 		return nil, errors.New("point d'accès invalide")
 	}
 	port, _ := strconv.Atoi(portStr)
+	var psk conf.Key
+	if p.PresharedKey != "" {
+		k, err := conf.NewPrivateKeyFromString(p.PresharedKey)
+		if err != nil {
+			return nil, errors.New("clé partagée invalide")
+		}
+		psk = *k
+	}
 
 	var addrs []netip.Prefix
 	for _, a := range p.Addresses {
@@ -75,6 +83,7 @@ func buildConfig(p Profile) (*conf.Config, error) {
 		},
 		Peers: []conf.Peer{{
 			PublicKey:           *pub,
+			PresharedKey:        psk,
 			AllowedIPs:          []netip.Prefix{netip.MustParsePrefix("0.0.0.0/0"), netip.MustParsePrefix("::/0")},
 			Endpoint:            conf.Endpoint{Host: host, Port: uint16(port)},
 			PersistentKeepalive: uint16(p.Keepalive),
@@ -124,7 +133,7 @@ func (t *Tunnel) Up(p Profile, full bool, dns4, dns6 []netip.Addr) (err error) {
 		}
 	}()
 
-	drv, size := toDriverConfiguration(cfg)
+	drv, size := toDriverConfiguration(cfg, false)
 	if err = adapter.SetConfiguration(drv, size); err != nil {
 		return fmt.Errorf("configuration du tunnel refusée : %w", err)
 	}
@@ -148,6 +157,38 @@ func (t *Tunnel) Up(p Profile, full bool, dns4, dns6 []netip.Addr) (err error) {
 		t.firewall = true
 	}
 	t.full = full
+	t.endpoint = p.Endpoint
+	return nil
+}
+
+// Switch change de serveur sans fermer le tunnel : la carte et le kill switch
+// restent en place, donc rien ne sort en clair pendant la bascule. Seuls la
+// clé, le serveur et les adresses dans le tunnel changent.
+func (t *Tunnel) Switch(p Profile, dns4, dns6 []netip.Addr) (err error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.adapter == nil || !t.full {
+		return errors.New("aucune protection active à basculer")
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("pilote WireGuard indisponible : %v", r)
+		}
+	}()
+	cfg, err := buildConfig(p)
+	if err != nil {
+		return err
+	}
+	drv, size := toDriverConfiguration(cfg, true)
+	if err := t.adapter.SetConfiguration(drv, size); err != nil {
+		return fmt.Errorf("nouveau serveur refusé par le pilote : %w", err)
+	}
+	if err := configureFamily(t.luid, windows.AF_INET, cfg, true, dns4); err != nil {
+		return err
+	}
+	if err := configureFamily(t.luid, windows.AF_INET6, cfg, true, dns6); err != nil {
+		return err
+	}
 	t.endpoint = p.Endpoint
 	return nil
 }
@@ -275,15 +316,20 @@ func (t *Tunnel) WaitHandshake(timeout time.Duration) bool {
 
 // toDriverConfiguration traduit la configuration pour WireGuardNT
 // (reprise de conf.ToDriverConfiguration, avec les types du paquet wgnt).
-func toDriverConfiguration(config *conf.Config) (*driver.Interface, uint32) {
+// Avec replacePeers, le serveur précédent est retiré (changement de profil à chaud).
+func toDriverConfiguration(config *conf.Config, replacePeers bool) (*driver.Interface, uint32) {
 	preallocation := unsafe.Sizeof(driver.Interface{}) + uintptr(len(config.Peers))*unsafe.Sizeof(driver.Peer{})
 	for i := range config.Peers {
 		preallocation += uintptr(len(config.Peers[i].AllowedIPs)) * unsafe.Sizeof(driver.AllowedIP{})
 	}
 	var c driver.ConfigBuilder
 	c.Preallocate(uint32(preallocation))
+	flags := driver.InterfaceHasPrivateKey | driver.InterfaceHasListenPort
+	if replacePeers {
+		flags |= driver.InterfaceReplacePeers
+	}
 	c.AppendInterface(&driver.Interface{
-		Flags:      driver.InterfaceHasPrivateKey | driver.InterfaceHasListenPort,
+		Flags:      flags,
 		ListenPort: config.Interface.ListenPort,
 		PrivateKey: config.Interface.PrivateKey,
 		PeerCount:  uint32(len(config.Peers)),

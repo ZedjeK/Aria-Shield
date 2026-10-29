@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"errors"
 	"net/netip"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -127,7 +129,8 @@ type Status struct {
 	Event      string        `json:"event"`
 	DataDir    string        `json:"dataDir"`
 	UserDir    string        `json:"userDir"`
-	VPN        vpn.View      `json:"vpn"`
+	VPN        vpn.View      `json:"vpn"`      // profil actif
+	Profiles   []vpn.View    `json:"profiles"` // tous les profils, sans clé
 	Tunnel     vpn.Stats     `json:"tunnel"`
 	Leak       *leak.Verdict `json:"leak"`
 	Components []Component   `json:"components"`
@@ -151,6 +154,14 @@ type SaveResult struct {
 	Profile vpn.View          `json:"profile"`
 	Fields  map[string]string `json:"fields"`
 	Error   string            `json:"error"`
+}
+
+// ImportResult résume l'import de fichiers .conf.
+type ImportResult struct {
+	Imported []vpn.View `json:"imported"`
+	Steps    []Step     `json:"steps"`
+	Error    string     `json:"error"`
+	Canceled bool       `json:"canceled"`
 }
 
 // SystemTests regroupe les vérifications côté Windows.
@@ -184,7 +195,8 @@ func (s *ShieldService) ServiceShutdown() error {
 func (s *ShieldService) Status() Status {
 	running := s.dns.Running()
 	tun := s.tun.Stats()
-	profile, _ := s.store.Load()
+	book, _ := s.store.Load()
+	profile := book.Current()
 
 	unbound := Component{ID: "unbound", Name: "Unbound", State: "ready",
 		Detail: "Intégré · v" + dnsengine.Version + " · arrêté"}
@@ -223,6 +235,7 @@ func (s *ShieldService) Status() Status {
 		DataDir:    s.sysDir,
 		UserDir:    s.userDir,
 		VPN:        profile.View(),
+		Profiles:   book.Views(),
 		Tunnel:     tun,
 		Leak:       lastLeak,
 		Components: []Component{
@@ -305,45 +318,206 @@ func (s *ShieldService) DisableSystemDNS() SystemResult {
 	return SystemResult{Steps: s.sys.Disable("")}
 }
 
-// ---------- Profil VPN ----------
+// ---------- Profils VPN ----------
 
-// VPNProfile renvoie le profil enregistré, sans jamais la clé privée.
+// VPNProfile renvoie le profil actif, sans jamais la clé privée.
 func (s *ShieldService) VPNProfile() vpn.View {
-	p, _ := s.store.Load()
+	p, _ := s.store.Active()
 	return p.View()
 }
 
-// SaveVPNProfile valide puis enregistre le profil (clé privée vide = garder l'actuelle).
-func (s *ShieldService) SaveVPNProfile(in vpn.Input) SaveResult {
-	if s.tun.Stats().Up {
-		return SaveResult{Error: "désactive la protection avant de modifier le profil"}
-	}
-	current, err := s.store.Load()
+// SaveVPNProfile valide puis enregistre un profil : id vide pour en créer un.
+// Clé privée ou clé partagée laissées vides = garder celles déjà enregistrées.
+func (s *ShieldService) SaveVPNProfile(id string, in vpn.Input) SaveResult {
+	book, err := s.store.Load()
 	if err != nil {
 		return SaveResult{Error: err.Error()}
 	}
-	p, err := in.Validate(current.PrivateKey)
+	var current vpn.Profile
+	if id != "" {
+		var ok bool
+		if current, ok = book.Get(id); !ok {
+			return SaveResult{Error: vpn.ErrNotFound.Error()}
+		}
+		if id == book.Active && s.tun.Stats().Up {
+			return SaveResult{Error: "désactive la protection avant de modifier le profil en cours d'utilisation"}
+		}
+	}
+	p, err := in.Validate(current)
 	if err != nil {
 		if fe, ok := err.(vpn.FieldErrors); ok {
 			return SaveResult{Fields: fe, Error: "certains champs sont à corriger"}
 		}
 		return SaveResult{Error: err.Error()}
 	}
-	if err := s.store.Save(p); err != nil {
+	p.ID = id
+	if p, err = s.store.Put(p); err != nil {
 		return SaveResult{Error: "enregistrement impossible : " + err.Error()}
 	}
 	return SaveResult{Profile: p.View()}
 }
 
-// DeleteVPNProfile efface le profil enregistré.
-func (s *ShieldService) DeleteVPNProfile() SystemResult {
-	if s.tun.Stats().Up {
-		return SystemResult{Error: "désactive la protection avant de supprimer le profil"}
+// ImportVPNConf ouvre le sélecteur de fichiers de Windows et importe les .conf
+// choisis. Les fichiers sont lus ici, côté Go : les clés ne transitent jamais
+// par l'interface. (Le glisser-déposer est impossible : Windows bloque les
+// dépôts de l'Explorateur vers une appli lancée en administrateur.)
+func (s *ShieldService) ImportVPNConf() ImportResult {
+	files, err := application.Get().Dialog.OpenFile().
+		SetTitle("Importer une configuration WireGuard").
+		AddFilter("Configuration WireGuard (*.conf)", "*.conf").
+		CanChooseFiles(true).
+		PromptForMultipleSelection()
+	if err != nil {
+		return ImportResult{Error: "sélecteur de fichiers indisponible : " + err.Error()}
 	}
-	if err := s.store.Delete(); err != nil {
+	if len(files) == 0 {
+		return ImportResult{Canceled: true}
+	}
+	return s.importFiles(files)
+}
+
+// importFiles importe chaque fichier comme un nouveau profil.
+func (s *ShieldService) importFiles(files []string) ImportResult {
+	var res ImportResult
+	failed := 0
+	for _, f := range files {
+		label := "Import de « " + vpn.NameFromFile(f) + " »"
+		p, notes, err := s.importOne(f)
+		if err != nil {
+			failed++
+			res.Steps = append(res.Steps, Step{Label: label, OK: false, Note: err.Error()})
+			continue
+		}
+		res.Imported = append(res.Imported, p.View())
+		res.Steps = append(res.Steps, Step{Label: label, OK: true, Note: "profil « " + p.Name + " » ajouté"})
+		for _, n := range notes {
+			res.Steps = append(res.Steps, Step{Label: "  " + n, OK: true})
+		}
+	}
+	if failed > 0 {
+		res.Error = strconv.Itoa(failed) + " fichier(s) non importé(s) : voir le journal"
+	}
+	return res
+}
+
+func (s *ShieldService) importOne(path string) (vpn.Profile, []string, error) {
+	fi, err := os.Stat(path)
+	if err != nil {
+		return vpn.Profile{}, nil, errors.New("fichier illisible")
+	}
+	if !fi.Mode().IsRegular() || fi.Size() > vpn.MaxConfSize {
+		return vpn.Profile{}, nil, errors.New("ce n'est pas une configuration WireGuard")
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return vpn.Profile{}, nil, errors.New("fichier illisible")
+	}
+	imp, err := vpn.ParseConf(string(data), vpn.NameFromFile(path))
+	if err != nil {
+		return vpn.Profile{}, nil, err
+	}
+	p, err := imp.Input.Validate(vpn.Profile{})
+	if err != nil {
+		if fe, ok := err.(vpn.FieldErrors); ok {
+			return vpn.Profile{}, nil, errors.New("valeurs incorrectes : " + fe.Error())
+		}
+		return vpn.Profile{}, nil, err
+	}
+	p, err = s.store.Put(p)
+	return p, imp.Notes, err
+}
+
+// DeleteVPNProfile efface un profil (pas celui qu'utilise le tunnel ouvert).
+func (s *ShieldService) DeleteVPNProfile(id string) SystemResult {
+	book, err := s.store.Load()
+	if err != nil {
 		return SystemResult{Error: err.Error()}
 	}
-	return SystemResult{Steps: []Step{{Label: "Profil VPN supprimé", OK: true}}}
+	p, ok := book.Get(id)
+	if !ok {
+		return SystemResult{Error: vpn.ErrNotFound.Error()}
+	}
+	if id == book.Active && s.tun.Stats().Up {
+		return SystemResult{Error: "désactive la protection avant de supprimer le profil en cours d'utilisation"}
+	}
+	if err := s.store.Delete(id); err != nil {
+		return SystemResult{Error: err.Error()}
+	}
+	return SystemResult{Steps: []Step{{Label: "Profil « " + p.Name + " » supprimé", OK: true}}}
+}
+
+// UseVPNProfile choisit le profil de la protection. Si la protection est
+// active, Aria bascule à chaud vers ce serveur, kill switch maintenu : en cas
+// d'échec, elle revient au serveur précédent.
+func (s *ShieldService) UseVPNProfile(id string) SystemResult {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var res SystemResult
+	add := func(label string, ok bool, note string) {
+		res.Steps = append(res.Steps, Step{Label: label, OK: ok, Note: note})
+	}
+	book, err := s.store.Load()
+	if err != nil {
+		res.Error = err.Error()
+		return res
+	}
+	next, ok := book.Get(id)
+	if !ok {
+		res.Error = vpn.ErrNotFound.Error()
+		return res
+	}
+	prev := book.Current()
+	tun := s.tun.Stats()
+	switch {
+	case tun.Up && !tun.Full:
+		res.Error = "un test de connexion est en cours, réessaie dans quelques secondes"
+		return res
+	case !tun.Full || prev.ID == next.ID:
+		if err := s.store.SetActive(id); err != nil {
+			res.Error = err.Error()
+			return res
+		}
+		add("Profil « "+next.Name+" » choisi", true, "utilisé à la prochaine activation")
+		return res
+	}
+
+	dns4 := []netip.Addr{netip.MustParseAddr("127.0.0.1")}
+	var dns6 []netip.Addr
+	if s.dns.IPv6() {
+		dns6 = []netip.Addr{netip.IPv6Loopback()}
+	}
+	add("Kill switch maintenu pendant la bascule", true, "rien ne sort en clair")
+	if err := s.tun.Switch(next, dns4, dns6); err != nil {
+		add("Bascule vers « "+next.Name+" »", false, err.Error())
+		res.Error = "bascule impossible : " + err.Error()
+		if s.tun.Switch(prev, dns4, dns6) == nil && s.tun.WaitHandshake(15*time.Second) {
+			add("Retour sur « "+prev.Name+" »", true, "")
+		}
+		return res
+	}
+	add("Bascule vers « "+next.Name+" »", true, next.Endpoint)
+	if !s.tun.WaitHandshake(15 * time.Second) {
+		add("Poignée de main avec le serveur", false, "aucune réponse en 15 s")
+		res.Error = "« " + next.Name + " » ne répond pas"
+		if s.tun.Switch(prev, dns4, dns6) == nil && s.tun.WaitHandshake(15*time.Second) {
+			add("Retour sur « "+prev.Name+" »", true, "")
+		} else {
+			add("Retour sur « "+prev.Name+" »", false, "le kill switch bloque tout : désactive puis réactive la protection")
+		}
+		return res
+	}
+	add("Poignée de main avec le serveur", true, "")
+	if err := s.store.SetActive(id); err != nil {
+		add("Profil actif enregistré", false, err.Error())
+	}
+
+	v := leak.Compare(s.boxIPs, leak.Public())
+	s.lastLeak = masked(v)
+	add("Test de fuite", v.V4OK && v.V6OK, v.Detail)
+	if !(v.V4OK && v.V6OK) {
+		res.Error = "bascule faite mais " + v.Detail
+	}
+	return res
 }
 
 // TestVPN ouvre le tunnel quelques secondes, sans routes ni kill switch,
@@ -356,7 +530,7 @@ func (s *ShieldService) TestVPN() SystemResult {
 		res.Error = "le tunnel est déjà ouvert"
 		return res
 	}
-	p, err := s.store.Load()
+	p, err := s.store.Active()
 	if err != nil || p.PrivateKey == "" {
 		res.Error = "enregistre d'abord un profil VPN"
 		return res
@@ -429,7 +603,7 @@ func (s *ShieldService) Protect() SystemResult {
 		add("Protection déjà active", true, "")
 		return res
 	}
-	p, err := s.store.Load()
+	p, err := s.store.Active()
 	if err != nil || p.PrivateKey == "" {
 		res.Error = "enregistre d'abord un profil VPN (page VPN)"
 		return res

@@ -4,32 +4,31 @@ package vpn
 
 import (
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
 	"net/netip"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 )
 
-const profileFile = "vpn-profile.bin"
-
 // Profile est la configuration WireGuard saisie à la main.
 // AllowedIPs n'en fait pas partie : Aria impose le tunnel complet.
 type Profile struct {
-	Name       string   `json:"name"`
-	PrivateKey string   `json:"privateKey"`
-	Addresses  []string `json:"addresses"`
-	PublicKey  string   `json:"publicKey"`
-	Endpoint   string   `json:"endpoint"`
-	Keepalive  int      `json:"keepalive"`
+	ID           string   `json:"id"`
+	Name         string   `json:"name"`
+	PrivateKey   string   `json:"privateKey"`
+	PresharedKey string   `json:"presharedKey,omitempty"`
+	Addresses    []string `json:"addresses"`
+	PublicKey    string   `json:"publicKey"`
+	Endpoint     string   `json:"endpoint"`
+	Keepalive    int      `json:"keepalive"`
 }
 
 // View est ce que l'interface a le droit de voir : jamais la clé privée.
 type View struct {
+	ID         string   `json:"id"`
+	Active     bool     `json:"active"`
 	Configured bool     `json:"configured"`
 	Name       string   `json:"name"`
 	Addresses  []string `json:"addresses"`
@@ -37,17 +36,20 @@ type View struct {
 	Endpoint   string   `json:"endpoint"`
 	Keepalive  int      `json:"keepalive"`
 	HasIPv6    bool     `json:"hasIpv6"`
+	HasPSK     bool     `json:"hasPsk"` // clé partagée présente (jamais affichée)
 }
 
 // Input est ce que l'interface envoie à l'enregistrement.
-// Adresses en texte libre (séparées par des virgules) ; clé privée vide = garder l'actuelle.
+// Adresses en texte libre (séparées par des virgules) ; clé privée ou clé
+// partagée vides = garder celles déjà enregistrées.
 type Input struct {
-	Name       string `json:"name"`
-	PrivateKey string `json:"privateKey"`
-	Addresses  string `json:"addresses"`
-	PublicKey  string `json:"publicKey"`
-	Endpoint   string `json:"endpoint"`
-	Keepalive  string `json:"keepalive"`
+	Name         string `json:"name"`
+	PrivateKey   string `json:"privateKey"`
+	PresharedKey string `json:"presharedKey"`
+	Addresses    string `json:"addresses"`
+	PublicKey    string `json:"publicKey"`
+	Endpoint     string `json:"endpoint"`
+	Keepalive    string `json:"keepalive"`
 }
 
 // FieldErrors associe un champ du formulaire à un message en français.
@@ -100,9 +102,9 @@ func parseEndpoint(s string) (host string, port int, err error) {
 	return h, port, nil
 }
 
-// Validate vérifie la saisie et renvoie un profil propre. existingKey est la
-// clé déjà enregistrée, utilisée si le champ clé privée est laissé vide.
-func (in Input) Validate(existingKey string) (Profile, error) {
+// Validate vérifie la saisie et renvoie un profil propre. existing est le profil
+// déjà enregistré : ses clés servent quand les champs correspondants sont vides.
+func (in Input) Validate(existing Profile) (Profile, error) {
 	errs := FieldErrors{}
 	p := Profile{Name: strings.TrimSpace(in.Name)}
 
@@ -115,10 +117,20 @@ func (in Input) Validate(existingKey string) (Profile, error) {
 
 	p.PrivateKey = strings.TrimSpace(in.PrivateKey)
 	if p.PrivateKey == "" {
-		p.PrivateKey = existingKey
+		p.PrivateKey = existing.PrivateKey
 	}
 	if err := checkKey(p.PrivateKey); err != nil {
 		errs["privateKey"] = err.Error()
+	}
+
+	p.PresharedKey = strings.TrimSpace(in.PresharedKey)
+	if p.PresharedKey == "" {
+		p.PresharedKey = existing.PresharedKey
+	}
+	if p.PresharedKey != "" {
+		if err := checkKey(p.PresharedKey); err != nil {
+			errs["presharedKey"] = err.Error()
+		}
 	}
 
 	p.PublicKey = strings.TrimSpace(in.PublicKey)
@@ -179,6 +191,7 @@ func (p Profile) HasIPv6() bool {
 // View renvoie la version affichable du profil.
 func (p Profile) View() View {
 	return View{
+		ID:         p.ID,
 		Configured: p.PrivateKey != "",
 		Name:       p.Name,
 		Addresses:  p.Addresses,
@@ -186,61 +199,6 @@ func (p Profile) View() View {
 		Endpoint:   p.Endpoint,
 		Keepalive:  p.Keepalive,
 		HasIPv6:    p.HasIPv6(),
+		HasPSK:     p.PresharedKey != "",
 	}
-}
-
-// Store range le profil chiffré dans le dossier de travail.
-type Store struct {
-	path string
-}
-
-// NewStore prépare le stockage du profil dans dataDir.
-func NewStore(dataDir string) *Store {
-	return &Store{path: filepath.Join(dataDir, profileFile)}
-}
-
-// Load lit et déchiffre le profil ; un profil absent renvoie un Profile vide.
-func (s *Store) Load() (Profile, error) {
-	data, err := os.ReadFile(s.path)
-	if errors.Is(err, os.ErrNotExist) {
-		return Profile{}, nil
-	}
-	if err != nil {
-		return Profile{}, err
-	}
-	plain, err := unprotect(data)
-	if err != nil {
-		return Profile{}, fmt.Errorf("profil illisible (créé par un autre compte Windows ?) : %w", err)
-	}
-	var p Profile
-	if err := json.Unmarshal(plain, &p); err != nil {
-		return Profile{}, err
-	}
-	return p, nil
-}
-
-// Save chiffre et enregistre le profil.
-func (s *Store) Save(p Profile) error {
-	plain, err := json.Marshal(p)
-	if err != nil {
-		return err
-	}
-	data, err := protect(plain)
-	if err != nil {
-		return err
-	}
-	tmp := s.path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o600); err != nil {
-		return err
-	}
-	return os.Rename(tmp, s.path)
-}
-
-// Delete efface le profil.
-func (s *Store) Delete() error {
-	err := os.Remove(s.path)
-	if errors.Is(err, os.ErrNotExist) {
-		return nil
-	}
-	return err
 }

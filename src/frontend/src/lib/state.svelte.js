@@ -108,11 +108,11 @@ export async function disableSystemDNS() {
 
 // ---------- VPN ----------
 
-export async function saveProfile(input) {
+export async function saveProfile(id, input) {
   app.busy = true
   app.actionError = ''
   try {
-    const res = await ShieldService.SaveVPNProfile(input)
+    const res = await ShieldService.SaveVPNProfile(id ?? '', input)
     if (res.error) app.actionError = res.error
     return res
   } catch (err) {
@@ -124,8 +124,19 @@ export async function saveProfile(input) {
   }
 }
 
-export async function deleteProfile() {
-  await run('Suppression du profil VPN', () => ShieldService.DeleteVPNProfile())
+export async function deleteProfile(id) {
+  await run('Suppression du profil VPN', () => ShieldService.DeleteVPNProfile(id))
+}
+
+export async function useProfile(id) {
+  const protecting = app.status?.protected
+  await run(protecting ? 'Changement de serveur' : 'Choix du profil VPN', () => ShieldService.UseVPNProfile(id))
+}
+
+// Le sélecteur de fichiers est celui de Windows ; Go lit les fichiers lui-même.
+export async function importConf() {
+  const res = await run('Import de configurations WireGuard', () => ShieldService.ImportVPNConf())
+  return res
 }
 
 export async function testVPN() {

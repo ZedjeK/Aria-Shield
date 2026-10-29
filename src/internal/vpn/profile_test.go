@@ -23,7 +23,7 @@ func validInput() Input {
 }
 
 func TestValidateOK(t *testing.T) {
-	p, err := validInput().Validate("")
+	p, err := validInput().Validate(Profile{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,7 +39,7 @@ func TestValidateOK(t *testing.T) {
 func TestValidateKeepsExistingKey(t *testing.T) {
 	in := validInput()
 	in.PrivateKey = ""
-	p, err := in.Validate(testPriv)
+	p, err := in.Validate(Profile{PrivateKey: testPriv})
 	if err != nil || p.PrivateKey != testPriv {
 		t.Fatalf("la clé existante doit être conservée : %v", err)
 	}
@@ -53,7 +53,7 @@ func TestValidateErrors(t *testing.T) {
 		Endpoint:   "89.39.107.156",
 		Keepalive:  "-3",
 	}
-	_, err := in.Validate("")
+	_, err := in.Validate(Profile{})
 	fe, ok := err.(FieldErrors)
 	if !ok {
 		t.Fatalf("FieldErrors attendu, reçu %v", err)
@@ -66,7 +66,7 @@ func TestValidateErrors(t *testing.T) {
 
 	in2 := validInput()
 	in2.PublicKey = in2.PrivateKey
-	if _, err := in2.Validate(""); err == nil || err.(FieldErrors)["publicKey"] == "" {
+	if _, err := in2.Validate(Profile{}); err == nil || err.(FieldErrors)["publicKey"] == "" {
 		t.Error("une clé publique identique à la clé privée doit être refusée")
 	}
 }
@@ -76,7 +76,7 @@ func TestEndpointIPv6AndDefaults(t *testing.T) {
 	in.Endpoint = "[2a00:7c80:0:3b6::10]:51820"
 	in.Keepalive = ""
 	in.Addresses = "10.2.0.2"
-	p, err := in.Validate("")
+	p, err := in.Validate(Profile{})
 	if err != nil {
 		t.Fatal(err)
 	}
