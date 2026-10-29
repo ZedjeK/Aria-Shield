@@ -11,9 +11,8 @@
   },
   "dependencies": {
     "@fontsource/ibm-plex-mono": "^5.2.0",
-    "@fontsource/ibm-plex-sans": "^5.2.0",
     "@fontsource/space-grotesk": "^5.2.0",
-    "@wailsio/runtime": "latest"
+    "@wailsio/runtime": "3.0.0-beta.28"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.0.0",

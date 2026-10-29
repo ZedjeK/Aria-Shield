@@ -1,0 +1,140 @@
+# Compile Aria-Shield.exe sur une machine Windows de GitHub.
+#
+# - push sur main : compilation + tests, l'exe est gardé 7 jours comme artefact.
+# - tag v* : idem, puis attestation de provenance et publication de la release.
+#   Les notes viennent de docs/releases/<tag>.md, l'empreinte SHA-256 est ajoutée.
+#
+# Vérifier qu'un exe publié vient bien de ce dépôt :
+#   gh attestation verify Aria-Shield.exe -R ZedjeK/Aria-Shield
+
+name: Compilation
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+    paths-ignore: ['**.md', 'docs/**', 'LICENSE', 'LICENCES-TIERS.txt']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    permissions:
+      contents: write # création de la release (tags seulement)
+      id-token: write # attestation de provenance
+      attestations: write
+    env:
+      IS_RELEASE: ${{ startsWith(github.ref, 'refs/tags/v') }}
+
+    steps:
+      - name: Sources
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: src/go.mod
+          cache-dependency-path: src/go.sum
+
+      - name: Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: lts/*
+
+      - name: Version de l'exe cohérente avec le tag
+        if: env.IS_RELEASE == 'true'
+        shell: bash
+        run: |
+          want="${GITHUB_REF_NAME#v}"
+          have=$(sed -n 's/.*"ProductVersion": *"\([^"]*\)".*/\1/p' src/build/windows/info.json)
+          if [ "$have" != "$want" ] && [ "$have" != "$want.0" ]; then
+            echo "::error::info.json annonce $have, le tag est $GITHUB_REF_NAME"
+            exit 1
+          fi
+          test -f "docs/releases/$GITHUB_REF_NAME.md" || { echo "::error::notes manquantes : docs/releases/$GITHUB_REF_NAME.md"; exit 1; }
+
+      - name: Tor Browser (téléchargé puis signature PGP vérifiée)
+        shell: bash
+        run: |
+          set -euo pipefail
+          ver=$(sed -n "s/^\$TorVersion *= *'\([0-9.]*\)'.*/\1/p" build.ps1)
+          test -n "$ver"
+          base="https://dist.torproject.org/torbrowser/$ver/tor-browser-windows-x86_64-portable-$ver.exe"
+          dir=src/internal/torbrowser/assets
+          curl -fsSL --retry 3 -o "$dir/tor-browser-portable.exe" "$base"
+          curl -fsSL --retry 3 -o "$dir/tor-browser-portable.exe.asc" "$base.asc"
+          export GNUPGHOME="$PWD/.gnupg-ci"
+          mkdir -p "$GNUPGHOME" && chmod 700 "$GNUPGHOME"
+          gpg --batch --quiet --import "$dir/torbrowser-signing-key.gpg"
+          gpg --batch --status-fd 1 --verify "$dir/tor-browser-portable.exe.asc" "$dir/tor-browser-portable.exe" \
+            | grep '^\[GNUPG:\] VALIDSIG ' | grep -q 'EF6E286DDA85EA2A4BA7DE684E2C6E8793298290' \
+            || { echo "::error::signature de Tor Browser $ver invalide"; exit 1; }
+          rm -rf "$GNUPGHOME"
+          echo "Tor Browser $ver : signature valide"
+
+      - name: Tests
+        working-directory: src
+        run: go test ./internal/...
+
+      - name: Compilation
+        shell: pwsh
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1
+
+      - name: Empreinte
+        id: hash
+        shell: bash
+        run: |
+          sha=$(sha256sum Aria-Shield.exe | cut -d' ' -f1)
+          echo "sha256=$sha" >> "$GITHUB_OUTPUT"
+          echo "### Aria-Shield.exe" >> "$GITHUB_STEP_SUMMARY"
+          echo "SHA-256 : \`$sha\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Exe gardé 7 jours
+        if: env.IS_RELEASE != 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: Aria-Shield-${{ github.sha }}
+          path: Aria-Shield.exe
+          retention-days: 7
+
+      - name: Attestation de provenance
+        if: env.IS_RELEASE == 'true'
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: Aria-Shield.exe
+
+      - name: Release
+        if: env.IS_RELEASE == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA256: ${{ steps.hash.outputs.sha256 }}
+        run: |
+          {
+            cat "docs/releases/$GITHUB_REF_NAME.md"
+            echo
+            echo "## Vérification"
+            echo
+            echo "SHA-256 de \`Aria-Shield.exe\` : \`$SHA256\`"
+            echo
+            echo "Compilé par GitHub Actions à partir du commit $GITHUB_SHA. Pour vérifier que l'exe vient bien de ce dépôt :"
+            echo
+            echo "\`\`\`"
+            echo "gh attestation verify Aria-Shield.exe -R $GITHUB_REPOSITORY"
+            echo "\`\`\`"
+          } > release-notes.md
+          gh release create "$GITHUB_REF_NAME" Aria-Shield.exe \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Aria Shield $GITHUB_REF_NAME" \
+            --notes-file release-notes.md \
+            --verify-tag
