@@ -34,9 +34,9 @@ Ton FAI voit chaque site que tu visites (par le DNS), peut en bloquer certains, 
 | **Discret** | Tout le trafic du PC : ton IP est cachée aux sites, ton FAI ne voit plus rien | Tunnel WireGuard vers ton fournisseur VPN + kill switch qui bloque tout ce qui sort hors du tunnel |
 | **Fantôme** | La navigation dans Tor Browser : anonymat fort | Tor Browser intégré, vérifié et tenu à jour par Aria. Combiné au mode Discret, ton FAI ne voit même pas que tu utilises Tor |
 
-**Plusieurs profils VPN** (jusqu'à 20) : importe le fichier `.conf` de ton fournisseur en un clic et change de pays avec « basculer », sans couper la protection. *Nouveauté de la v0.9, déjà dans le code de `main`.*
+**Plusieurs profils VPN** (jusqu'à 20) : importe le fichier `.conf` de ton fournisseur en un clic et change de pays avec « basculer », sans couper la protection.
 
-**Toujours active si tu le veux** (v0.9) : fermer la fenêtre range Aria dans la zone de notification, sans rien couper. Dans « réglages », active « Démarrer avec Windows » : Aria se lance à l'ouverture de ta session, sans fenêtre UAC, et réactive ta dernière protection (DNS seul ou mode Discret).
+**Toujours active si tu le veux** : fermer la fenêtre range Aria dans la zone de notification, sans rien couper. Dans « réglages », active « Démarrer avec Windows » : Aria se lance à l'ouverture de ta session, sans fenêtre UAC, et réactive ta dernière protection (DNS seul ou mode Discret).
 
 Une page **Tests** vérifie ce qu'Aria annonce : Windows passe bien par le résolveur, aucune fuite d'IP en IPv4 ou IPv6, kill switch actif, et navigateurs dont le « DNS sécurisé » contournerait Aria.
 
@@ -85,14 +85,14 @@ Si tu lances Aria depuis un compte standard en saisissant le mot de passe d'un a
 
 ## Premiers pas
 
-1. **VPN** : télécharge une configuration WireGuard chez ton fournisseur (Proton VPN, gratuit compris, Mullvad, IVPN…), puis « importer .conf » (v0.9) ou recopie ses valeurs à la main.
+1. **VPN** : télécharge une configuration WireGuard chez ton fournisseur (Proton VPN, gratuit compris, Mullvad, IVPN…), puis « importer .conf » ou recopie ses valeurs à la main.
 2. **Accueil** : mode Discret, puis « activer la protection ». Résolveur, DNS de Windows, tunnel et kill switch démarrent ensemble. Quand rien ne te protège, le logo de la fenêtre est délavé.
 3. **Mode Fantôme** : lance Tor Browser depuis Aria pour naviguer anonymement. Aria l'installe au premier lancement et vérifie ses mises à jour.
 4. **Tests** : vérifie qu'aucune fuite ne passe, et repère les navigateurs dont le « DNS sécurisé » contournerait Aria.
 
 Juste un DNS sans blocage, sans VPN ? Sur la page Résolveur DNS, démarre le résolveur puis active « Utiliser pour tout Windows ». Ton IP reste alors visible.
 
-Pour changer de pays protection active : page VPN, « basculer » sur un autre profil (v0.9). Le kill switch reste en place pendant le changement.
+Pour changer de pays protection active : page VPN, « basculer » sur un autre profil. Le kill switch reste en place pendant le changement.
 
 Pour revenir à la normale à tout moment : « restaurer --tout », en bas de la barre latérale. Fermer la fenêtre ne coupe rien : pour arrêter Aria, « Quitter » dans le menu de son icône (clic droit, zone de notification) ou dans « réglages ».
 
