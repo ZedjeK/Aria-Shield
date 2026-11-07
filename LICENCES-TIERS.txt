@@ -1,4 +1,8 @@
-Aria Shield embarque les logiciels suivants.
+Aria Shield embarque les logiciels suivants. Le code propre à Aria Shield
+est publié sous licence MIT (fichier LICENSE). Le paquet
+src/internal/killswitch est dérivé de wireguard-windows (Copyright (C)
+2019-2026 WireGuard LLC, licence MIT, voir
+src/internal/killswitch/COPYING-wireguard-windows.txt).
 
 == Unbound 1.26.1 (NLnet Labs) ==
 
