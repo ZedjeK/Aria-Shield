@@ -63,26 +63,37 @@ type UpdateInfo struct {
 }
 
 // Manager pilote le dossier Tor Browser d'Aria.
+//
+// Aria tourne en administrateur, mais le dossier de Tor Browser appartient à
+// l'utilisateur : n'importe quel programme sans droits peut y créer des
+// jonctions. Installer, mettre à jour ou recopier le profil en administrateur
+// permettrait alors de faire écrire Aria n'importe où (System32 compris). Ces
+// opérations passent donc par l'assistant (helper.go) : le même exe, relancé
+// avec les droits normaux de l'utilisateur. Aria ne fait que lire ce dossier.
 type Manager struct {
-	dir  string     // Tor Browser, dans les données de l'utilisateur
-	work string     // installeurs téléchargés, exécutés en admin : dossier réservé aux administrateurs
-	mu   sync.Mutex // une seule installation ou mise à jour à la fois
+	dir string     // Tor Browser, dans les données de l'utilisateur
+	mu  sync.Mutex // une seule installation ou mise à jour à la fois
 
 	pmu      sync.Mutex
 	progress Progress
+	report   func(Progress) // côté assistant : publie l'avancement pour Aria
 }
 
-// New prépare le gestionnaire : Tor Browser vivra dans userDir\TorBrowser, et les
-// installeurs (lancés en administrateur) passeront par workDir, réservé aux admins.
-func New(userDir, workDir string) *Manager {
-	return &Manager{dir: filepath.Join(userDir, dirName), work: workDir}
+// New prépare le gestionnaire : Tor Browser vivra dans userDir\TorBrowser.
+func New(userDir string) *Manager {
+	return &Manager{dir: filepath.Join(userDir, dirName)}
 }
 
 // setProgress publie l'avancement ; une phase vide signifie « terminé ».
 func (m *Manager) setProgress(phase string, done, total int64) {
+	p := Progress{Active: phase != "", Phase: phase, Done: done, Total: total}
 	m.pmu.Lock()
-	m.progress = Progress{Active: phase != "", Phase: phase, Done: done, Total: total}
+	m.progress = p
+	report := m.report
 	m.pmu.Unlock()
+	if report != nil {
+		report(p)
+	}
 }
 
 // firefox est l'exécutable de Tor Browser une fois installé.
@@ -184,7 +195,8 @@ func (m *Manager) CheckUpdate() UpdateInfo {
 	return info
 }
 
-// EnsureInstalled installe la version embarquée si Tor Browser est absent.
+// EnsureInstalled installe la version embarquée si Tor Browser est absent,
+// par l'assistant (droits de l'utilisateur).
 func (m *Manager) EnsureInstalled() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -192,11 +204,16 @@ func (m *Manager) EnsureInstalled() error {
 		return nil
 	}
 	defer m.setProgress("", 0, 0)
+	return m.runHelper(opInstall, "")
+}
 
-	if err := os.MkdirAll(filepath.Dir(m.dir), 0o755); err != nil {
-		return err
+// installHere fait l'installation dans le processus courant : celui de
+// l'assistant, sans droits administrateur. work est son dossier de travail.
+func (m *Manager) installHere(work string) error {
+	if installedVersion(m.dir) != "" {
+		return nil
 	}
-	tmp := filepath.Join(m.work, "tor-browser-setup.exe")
+	tmp := filepath.Join(work, "tor-browser-setup.exe")
 	m.setProgress("Vérification de la signature", 0, 0)
 	if err := Verify(bytes.NewReader(embeddedInstaller), embeddedSig); err != nil {
 		return fmt.Errorf("Tor Browser embarqué : %w", err)
@@ -204,7 +221,6 @@ func (m *Manager) EnsureInstalled() error {
 	if err := os.WriteFile(tmp, embeddedInstaller, 0o644); err != nil {
 		return err
 	}
-	defer os.Remove(tmp)
 	return m.installFrom(tmp, embeddedSig, m.dir)
 }
 
@@ -272,9 +288,10 @@ func (m *Manager) download(url, dst, phase string) error {
 }
 
 // Update télécharge, vérifie et installe la dernière version, en gardant
-// favoris, réglages et ponts. L'ancienne version reste en place en cas d'échec.
+// favoris, réglages et ponts, par l'assistant (droits de l'utilisateur).
+// L'ancienne version reste en place en cas d'échec.
 func (m *Manager) Update(info UpdateInfo) error {
-	if !info.Checked || info.binURL == "" {
+	if !info.Checked || info.binURL == "" || info.Latest == "" {
 		return errors.New("vérifie d'abord les mises à jour")
 	}
 	m.mu.Lock()
@@ -284,11 +301,24 @@ func (m *Manager) Update(info UpdateInfo) error {
 	if running(m.dir) {
 		return errors.New("ferme Tor Browser avant la mise à jour")
 	}
-	base := m.work
-	bin := filepath.Join(base, "tor-browser-update.exe")
+	return m.runHelper(opUpdate, info.Latest)
+}
+
+// updateHere fait la mise à jour dans le processus de l'assistant : il relit
+// l'index officiel lui-même et n'installe que la version annoncée à Aria.
+func (m *Manager) updateHere(work, version string) error {
+	if running(m.dir) {
+		return errors.New("ferme Tor Browser avant la mise à jour")
+	}
+	info := m.CheckUpdate()
+	if !info.Checked {
+		return errors.New(info.Error)
+	}
+	if info.Latest != version {
+		return fmt.Errorf("l'index annonce maintenant la version %s : revérifie les mises à jour", info.Latest)
+	}
+	bin := filepath.Join(work, "tor-browser-update.exe")
 	sigPath := bin + ".asc"
-	defer os.Remove(bin)
-	defer os.Remove(sigPath)
 
 	if err := m.download(info.sigURL, sigPath, "Téléchargement de la signature"); err != nil {
 		return fmt.Errorf("signature : %w", err)

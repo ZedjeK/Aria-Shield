@@ -2,8 +2,11 @@ package torbrowser
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -78,5 +81,62 @@ func TestInstalledVersion(t *testing.T) {
 		[]byte(`{"version":"15.0.24","architecture":"windows-x86_64","channel":"release"}`), 0o644)
 	if v := installedVersion(dir); v != "15.0.24" {
 		t.Fatalf("version lue : %q", v)
+	}
+}
+
+func TestHelperRefusesBadArguments(t *testing.T) {
+	dir := t.TempDir()
+	for _, args := range [][]string{
+		nil,
+		{"-op", "inconnue", "-dossier", dir, "-jeton", "j"},
+		{"-op", opInstall, "-dossier", "relatif", "-jeton", "j"},
+		{"-op", opInstall, "-dossier", dir},
+		{"-op", opUpdate, "-dossier", dir, "-jeton", "j"}, // version manquante
+	} {
+		if code := RunHelper(args); code != 2 {
+			t.Errorf("RunHelper(%q) = %d, attendu 2", args, code)
+		}
+	}
+}
+
+func TestHelperReportsFailureWithNonce(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		// Sous Windows (et sur GitHub, où Tor Browser est téléchargé avant les
+		// tests), l'installeur fonctionne vraiment : le cas d'échec n'y est pas
+		// reproductible sans installer Tor Browser pour de bon.
+		t.Skip("l'installeur de Tor Browser fonctionne sous Windows")
+	}
+	dir := t.TempDir()
+	// Hors Windows, l'installeur ne peut pas tourner : l'assistant doit le dire
+	// dans son fichier d'avancement, avec le bon jeton, et sortir en échec.
+	if code := RunHelper([]string{"-op", opInstall, "-dossier", dir, "-jeton", "abc"}); code != 1 {
+		t.Fatalf("code = %d, attendu 1", code)
+	}
+	st, ok := readStatus(filepath.Join(dir, statusName), "abc")
+	if !ok || st.Error == "" {
+		t.Fatalf("avancement = %+v (lu : %v), une erreur était attendue", st, ok)
+	}
+	if _, ok := readStatus(filepath.Join(dir, statusName), "autre-jeton"); ok {
+		t.Error("un fichier d'un autre lancement ne doit pas être retenu")
+	}
+	// Le dossier de travail est effacé, même en cas d'échec.
+	entries, _ := os.ReadDir(dir)
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), ".tor-travail-") {
+			t.Errorf("dossier de travail laissé : %s", e.Name())
+		}
+	}
+}
+
+func TestReadStatusTruncates(t *testing.T) {
+	path := filepath.Join(t.TempDir(), statusName)
+	long := strings.Repeat("x", 5000)
+	data, _ := json.Marshal(helperStatus{Nonce: "j", Error: long, Progress: Progress{Phase: long}})
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	st, ok := readStatus(path, "j")
+	if !ok || len(st.Error) > 510 || len(st.Progress.Phase) > 210 {
+		t.Errorf("texte non tronqué : erreur %d, phase %d", len(st.Error), len(st.Progress.Phase))
 	}
 }

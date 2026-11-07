@@ -28,6 +28,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -36,6 +37,7 @@ import (
 	"aria-shield/internal/dnsengine"
 	"aria-shield/internal/leak"
 	"aria-shield/internal/paths"
+	"aria-shield/internal/prefs"
 	"aria-shield/internal/sysdns"
 	"aria-shield/internal/sysx"
 	"aria-shield/internal/torbrowser"
@@ -53,7 +55,7 @@ type ShieldService struct {
 	tun   *vpn.Tunnel         // tunnel WireGuard et kill switch
 	tor   *torbrowser.Manager // Tor Browser portable
 
-	userDir  string // %LOCALAPPDATA%\AriaShield
+	userDir  string // %USERPROFILE%\.Aria-Shield
 	sysDir   string // %PROGRAMDATA%\AriaShield (réservé aux administrateurs)
 	noticeMu sync.Mutex
 	notice   string // message affiché une fois (migration, erreur de dossier)
@@ -65,6 +67,14 @@ type ShieldService struct {
 	boxIPs   leak.IPs   // IP publique mesurée juste avant la protection
 	lastLeak *leak.Verdict
 	ownsDNS  bool // la bascule du DNS de Windows a été faite par Protect
+
+	prefs      *prefs.Store  // réglages et dernière protection (startup.go)
+	resumeMu   sync.Mutex    // protège resumeStop et resuming
+	resumeStop chan struct{} // fermé quand l'utilisateur reprend la main
+	resuming   string        // réactivation en cours, affichée dans l'interface
+	restarts   []time.Time   // relances automatiques d'Unbound (sous resumeMu)
+	notify     *notifier     // notifications Windows (notify.go), posé par main
+	quitting   atomic.Bool   // Aria est en train de quitter
 }
 
 // NewShieldService prépare le service et ses moteurs (rien n'est lancé).
@@ -72,9 +82,15 @@ func NewShieldService() *ShieldService {
 	s := &ShieldService{tun: vpn.NewTunnel()}
 
 	var errs []string
-	userDir, err := paths.UserDir()
+	userDir, movedHome, err := paths.UserDir()
 	if err != nil {
-		errs = append(errs, "dossier utilisateur : "+err.Error())
+		errs = append(errs, "déplacement de tes données vers .Aria-Shield, réessayé au prochain lancement"+
+			" (ferme Tor Browser avant) : "+err.Error())
+	}
+	if movedHome {
+		s.notice = "Tes données (profils VPN, Tor Browser) sont maintenant dans " + userDir +
+			", comme pour les autres applis Aria. L'ancien cache de l'interface, %APPDATA%\\Aria-Shield.exe," +
+			" peut être supprimé."
 	}
 	sysDir, aside, err := paths.SystemDir()
 	sysLocked := err == nil
@@ -112,21 +128,28 @@ func NewShieldService() *ShieldService {
 	s.sys = sysdns.New(sysDir)
 	s.sys.Exclude(vpn.AdapterName) // la carte VPN est configurée par le tunnel lui-même
 	s.store = vpn.NewStore(userDir)
-	s.tor = torbrowser.New(userDir, sysDir)
+	s.tor = torbrowser.New(userDir)
+	s.prefs = prefs.New(userDir)
 
 	// Filets de sécurité si Unbound s'arrête tout seul.
 	s.dns.OnUnexpectedExit(func() {
-		if s.tun.Stats().Full {
-			// Protection active : on relance Unbound, sinon on coupe tout proprement.
+		// Windows ou le tunnel comptent sur Unbound : on le relance d'abord (3 fois
+		// en 10 min au plus, pour ne pas boucler sur un Unbound qui plante en série).
+		if (s.tun.Stats().Full || s.sys.Enabled()) && s.allowRestart() {
 			if _, err := s.dns.Start(); err == nil {
 				return
 			}
+		}
+		if s.tun.Stats().Full {
+			// Relance impossible : on coupe tout proprement.
 			s.tun.Down()
 			s.sys.Disable("Unbound s'est arrêté : protection coupée et connexion d'origine remise.")
+			s.alert("Protection coupée", "Le résolveur Unbound s'est arrêté et n'a pas pu être relancé : tunnel fermé, connexion d'origine remise.")
 			return
 		}
 		if s.sys.Enabled() {
 			s.sys.Disable("Unbound s'est arrêté : ton DNS d'origine a été remis automatiquement.")
+			s.alert("DNS d'origine remis", "Le résolveur Unbound s'est arrêté et n'a pas pu être relancé : Windows utilise de nouveau le DNS de ta box.")
 		}
 	})
 	return s
@@ -154,6 +177,8 @@ type Status struct {
 	Tunnel     vpn.Stats     `json:"tunnel"`
 	Leak       *leak.Verdict `json:"leak"`
 	Components []Component   `json:"components"`
+	Resuming   string        `json:"resuming"` // réactivation automatique en cours
+	Version    string        `json:"version"`
 }
 
 // ActionResult regroupe le journal d'une action et le test qui la suit.
@@ -195,14 +220,22 @@ type SystemTests struct {
 	Browsers       []browsers.Info `json:"browsers"`
 }
 
-// ServiceStartup : si Aria avait planté en laissant Windows sur le résolveur, on répare.
+// ServiceStartup : si Aria avait planté en laissant Windows sur le résolveur, on
+// répare ; puis, en arrière-plan, la dernière protection est réactivée et la
+// copie lancée au démarrage de Windows remise à jour (startup.go).
 func (s *ShieldService) ServiceStartup(ctx context.Context, options application.ServiceOptions) error {
 	s.sys.RecoverLeftover()
+	go s.refreshAutostart()
+	go s.resume()
 	return nil
 }
 
-// ServiceShutdown : à la fermeture, tout revient comme avant.
+// ServiceShutdown : quand Aria quitte (menu « Quitter », fin de session
+// Windows), tout revient comme avant. Fermer la fenêtre ne quitte pas : Aria
+// reste dans la zone de notification (main.go).
 func (s *ShieldService) ServiceShutdown() error {
+	s.quitting.Store(true)
+	s.cancelResume()
 	s.tun.Down()
 	if s.sys.Enabled() {
 		s.sys.Disable("")
@@ -264,6 +297,8 @@ func (s *ShieldService) Status() Status {
 			wg,
 			tor,
 		},
+		Resuming: s.resumingText(),
+		Version:  Version,
 	}
 }
 
@@ -276,6 +311,7 @@ func (s *ShieldService) Adapters() []sysdns.AdapterView {
 
 // StartDNS démarre le résolveur embarqué puis le teste.
 func (s *ShieldService) StartDNS() ActionResult {
+	s.cancelResume()
 	steps, err := s.dns.Start()
 	res := ActionResult{Steps: steps}
 	if err != nil {
@@ -288,6 +324,7 @@ func (s *ShieldService) StartDNS() ActionResult {
 
 // StopDNS rend son DNS à Windows si besoin, puis arrête le résolveur.
 func (s *ShieldService) StopDNS() SystemResult {
+	s.cancelResume()
 	if s.tun.Stats().Full {
 		return SystemResult{Error: "désactive d'abord la protection : le résolveur en fait partie"}
 	}
@@ -296,6 +333,7 @@ func (s *ShieldService) StopDNS() SystemResult {
 		res.Steps = s.sys.Disable("")
 	}
 	s.dns.Stop()
+	s.remember(prefs.None)
 	return res
 }
 
@@ -306,8 +344,12 @@ func (s *ShieldService) TestDNS() dnsengine.TestResult {
 
 // EnableSystemDNS fait utiliser le résolveur par tout Windows, après vérification.
 func (s *ShieldService) EnableSystemDNS() SystemResult {
+	s.cancelResume()
 	var res SystemResult
 	res.Steps, res.Error = s.enableSystemDNS()
+	if res.Error == "" {
+		s.remember(prefs.DNS)
+	}
 	return res
 }
 
@@ -337,9 +379,11 @@ func (s *ShieldService) enableSystemDNS() ([]Step, string) {
 
 // DisableSystemDNS rend son DNS d'origine à Windows.
 func (s *ShieldService) DisableSystemDNS() SystemResult {
+	s.cancelResume()
 	if s.tun.Stats().Full {
 		return SystemResult{Error: "désactive d'abord la protection : le DNS de Windows en fait partie"}
 	}
+	s.remember(prefs.None)
 	return SystemResult{Steps: s.sys.Disable("")}
 }
 
@@ -611,10 +655,21 @@ func masked(v leak.Verdict) *leak.Verdict {
 	return &v
 }
 
-// Protect active le mode Discret : résolveur, DNS de Windows, tunnel et kill switch.
+// Protect active le mode Discret à la demande de l'utilisateur, et le retient
+// pour le réactiver au prochain lancement.
+func (s *ShieldService) Protect() SystemResult {
+	s.cancelResume()
+	res := s.protect()
+	if s.tun.Stats().Full {
+		s.remember(prefs.Discret)
+	}
+	return res
+}
+
+// protect active le mode Discret : résolveur, DNS de Windows, tunnel et kill switch.
 // Chaque étape est vérifiée ; au premier échec, fail défait ce qui a été mis en
 // place (rollbackLocked) pour ne jamais laisser une protection à moitié posée.
-func (s *ShieldService) Protect() SystemResult {
+func (s *ShieldService) protect() SystemResult {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -714,6 +769,8 @@ func (s *ShieldService) rollbackLocked() []Step {
 
 // Unprotect désactive la protection et rend sa connexion d'origine à Windows.
 func (s *ShieldService) Unprotect() SystemResult {
+	s.cancelResume()
+	s.remember(prefs.None)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	res := SystemResult{Steps: []Step{}}

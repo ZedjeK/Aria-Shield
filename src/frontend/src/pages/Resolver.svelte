@@ -35,7 +35,7 @@
     <span class="pill" class:on={running}>{running ? 'Actif' : 'Arrêté'}</span>
   </div>
   <p class="page-intro">
-    Unbound tourne depuis Aria, sans rien installer : récursion complète, DNSSEC, aucun DNS tiers. Il s'arrête tout seul quand tu fermes Aria.
+    Unbound tourne depuis Aria, sans rien installer : récursion complète, DNSSEC, aucun DNS tiers. Il continue quand tu fermes la fenêtre (Aria reste dans la zone de notification) et s'arrête quand tu quittes Aria.
   </p>
 
   <div class="grid-2">
@@ -90,7 +90,7 @@
         <p class="hint">{switchReason}</p>
       {/if}
       <p class="card-text">
-        Ta config d'origine est photographiée avant toute modification et remise automatiquement si tu coupes, si Unbound s'arrête ou si tu fermes Aria.
+        Ta config d'origine est photographiée avant toute modification et remise automatiquement si tu coupes, si Unbound s'arrête ou si tu quittes Aria.
       </p>
 
       {#if adapters.length}

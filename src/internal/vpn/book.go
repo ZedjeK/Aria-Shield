@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-// Fichiers dans %LOCALAPPDATA%\AriaShield.
+// Fichiers dans %USERPROFILE%\.Aria-Shield.
 const (
 	booksFile  = "vpn-profiles.bin"
 	legacyFile = "vpn-profile.bin" // un seul profil, jusqu'à la v0.8

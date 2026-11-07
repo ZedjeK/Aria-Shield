@@ -4,6 +4,11 @@ package paths
 
 import "os"
 
+// programData : hors Windows, la variable d'environnement suffit (tests).
+func programData() string {
+	return envOr("ProgramData", os.TempDir()+"/ProgramData")
+}
+
 // Hors Windows (développement uniquement) : dossier réservé au propriétaire.
 func prepareSystemDir(dir string) (string, error) {
 	if err := os.MkdirAll(dir, 0o700); err != nil {

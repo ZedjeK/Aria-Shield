@@ -335,6 +335,50 @@ export async function restoreAll() {
   app.page = 'dns'
 }
 
+// ---------- Réglages ----------
+
+/** Réglages de démarrage (lus à l'ouverture de la page Réglages). */
+export const settings = $state({
+  data: null, // { autostart: { enabled, exe }, resume, last }
+  error: '',
+})
+
+/** Relit les réglages (interroge le Planificateur de tâches : pas en boucle). */
+export async function loadSettings() {
+  try {
+    settings.data = await ShieldService.Settings()
+    settings.error = ''
+  } catch (err) {
+    settings.error = message(err)
+  }
+}
+
+/** Crée ou supprime la tâche qui lance Aria à l'ouverture de session. */
+export async function setAutostart(on) {
+  await run(on ? 'Démarrage avec Windows' : 'Arrêt du démarrage avec Windows', () => ShieldService.SetAutostart(on))
+  await loadSettings()
+}
+
+/** Active ou non la réactivation de la dernière protection au lancement. */
+export async function setResume(on) {
+  await run('Réactivation au lancement', () => ShieldService.SetResume(on))
+  await loadSettings()
+}
+
+/** Active ou non les notifications Windows (incidents, sortie d'Aria). */
+export async function setNotifications(on) {
+  await run('Notifications Windows', () => ShieldService.SetNotifications(on))
+  await loadSettings()
+}
+
+/** Quitte vraiment Aria : la connexion d'origine est remise par le Go. */
+export async function quitApp() {
+  app.busy = true
+  try {
+    await ShieldService.Quit()
+  } catch {}
+}
+
 // ---------- Tests ----------
 
 /** Tests côté Windows : marqueur DNS, cartes, fuites, navigateurs. */

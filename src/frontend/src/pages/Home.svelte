@@ -215,8 +215,16 @@
     .bottom {
       grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
     }
-    .word {
-      font-size: 52px;
+  }
+  /* Fenêtre étroite : le détail de chaque moteur passe sous son nom, au lieu
+     de s'écraser dans une colonne d'une douzaine de caractères. */
+  @container (max-width: 420px) {
+    .line {
+      grid-template-columns: 40px minmax(0, 1fr);
+      row-gap: 2px;
+    }
+    .detail {
+      grid-column: 2;
     }
   }
   @container (max-width: 520px) {

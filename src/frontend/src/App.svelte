@@ -11,6 +11,7 @@
   import Tests from './pages/Tests.svelte'
   import Vpn from './pages/Vpn.svelte'
   import Ghost from './pages/Ghost.svelte'
+  import Settings from './pages/Settings.svelte'
 
   // Entrées de navigation : label pour les lecteurs d'écran et l'infobulle,
   // cmd pour l'affichage façon console (« >dns »), icône quand la barre est repliée.
@@ -20,6 +21,7 @@
     { id: 'vpn', label: 'VPN', cmd: 'vpn', icon: 'vpn' },
     { id: 'ghost', label: 'Mode Fantôme', cmd: 'fantôme', icon: 'ghost' },
     { id: 'tests', label: 'Tests', cmd: 'tests', icon: 'tests' },
+    { id: 'settings', label: 'Réglages', cmd: 'réglages', icon: 'settings' },
   ]
 
   // Pastilles de la barre latérale et bouton « restaurer --tout ».
@@ -86,7 +88,7 @@
         <span class="nav-icon"><Icon name="restore" size={18} /></span>
         <span class="label">restaurer --tout</span>
       </button>
-      <span class="version label">aria-shield v0.8</span>
+      <span class="version label">aria-shield v{app.status?.version ?? '…'}</span>
     </div>
   </nav>
 
@@ -97,6 +99,9 @@
     {/if}
     {#if app.loadError}
       <p class="banner" role="alert">Impossible de lire l'état du système : {app.loadError}</p>
+    {/if}
+    {#if app.status?.resuming}
+      <p class="banner info" role="status">{app.status.resuming} Toute action de ta part arrête la réactivation automatique.</p>
     {/if}
     {#if app.status?.event}
       <div class="banner info" role="status">
@@ -116,6 +121,8 @@
       <Ghost />
     {:else if app.page === 'tests'}
       <Tests />
+    {:else if app.page === 'settings'}
+      <Settings />
     {/if}
   </main>
 </div>
@@ -136,6 +143,8 @@
     flex-direction: column;
     gap: 20px;
     min-width: 0;
+    /* fenêtre basse : la barre défile plutôt que de couper « restaurer --tout » */
+    overflow-y: auto;
   }
   .brand {
     display: flex;
@@ -303,7 +312,6 @@
     gap: 16px;
   }
 
-  /* Fenêtre étroite : la barre latérale se replie en icônes */
   /* Fenêtre étroite : la barre latérale se replie en icônes (48 px de cible) */
   @media (max-width: 760px) {
     .shell {
