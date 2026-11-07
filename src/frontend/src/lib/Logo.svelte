@@ -10,7 +10,7 @@
 <svg
   width={size}
   height={size}
-  viewBox="-8 -8 176 176"
+  viewBox="0 0 160 160"
   class:dim
   role={label ? 'img' : undefined}
   aria-label={label || undefined}
@@ -46,10 +46,10 @@
     filter="url(#{ref('g2')})"
   />
   <g filter="url(#{ref('g')})" stroke-linejoin="round">
-    <g clip-path="url(#{ref('bl')})" fill="none" stroke="#7DF9FF" stroke-width="4"><use href="#{ref('a')}" /></g>
-    <g clip-path="url(#{ref('br')})" fill="none" stroke="#5C8BFF" stroke-width="4"><use href="#{ref('a')}" /></g>
+    <g clip-path="url(#{ref('bl')})" fill="none" stroke="#7DF9FF" stroke-width="5"><use href="#{ref('a')}" /></g>
+    <g clip-path="url(#{ref('br')})" fill="none" stroke="#5C8BFF" stroke-width="5"><use href="#{ref('a')}" /></g>
     <g transform="translate(7,0)">
-      <g clip-path="url(#{ref('t')})" fill="none" stroke="#FFFFFF" stroke-width="4"><use href="#{ref('a')}" /></g>
+      <g clip-path="url(#{ref('t')})" fill="none" stroke="#FFFFFF" stroke-width="5"><use href="#{ref('a')}" /></g>
     </g>
   </g>
   </g>
