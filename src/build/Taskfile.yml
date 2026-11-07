@@ -1,3 +1,7 @@
+# Tâches de compilation communes, générées par « wails3 init » (Wails v3.0.0-beta.28)
+# et laissées telles quelles, à une exception près : generate:icons ne recrée
+# pas windows/icon.ico s'il existe, pour garder l'icône d'Aria et ses versions
+# simplifiées en 16 et 24 px (voir plus bas).
 version: '3'
 
 tasks:

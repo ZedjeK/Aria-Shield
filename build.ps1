@@ -1,23 +1,38 @@
 ﻿# Aria Shield : génère le projet Wails v3, applique les sources et compile l'exe.
 # Usage (PowerShell normal, pas besoin d'admin) :
 #   powershell -ExecutionPolicy Bypass -File .\build.ps1
+#
+# Étapes :
+#   1. vérifie Go et Node.js, installe le CLI Wails (version figée) si besoin ;
+#   2. au premier passage, génère un projet Wails vierge dans .work\aria-shield ;
+#   3. télécharge Tor Browser (trop lourd pour le dépôt) ;
+#   4. recopie src\ par-dessus le projet généré ;
+#   5. compile, puis dépose Aria-Shield.exe à la racine.
+# La compilation GitHub (.github/workflows/build.yml) appelle ce même script.
+#
+# Le fichier est en UTF-8 avec BOM : Windows PowerShell 5.1 en a besoin pour
+# lire correctement les accents.
 
 $ErrorActionPreference = 'Stop'
-$WailsVersion = 'v3.0.0-beta.28'
+$WailsVersion = 'v3.0.0-beta.28' # même version que dans src/go.mod
 
 $Root = $PSScriptRoot
 $Src  = Join-Path $Root 'src'
 $Work = Join-Path $Root '.work'
 $App  = Join-Path $Work 'aria-shield'
 
+# Affiche le titre d'une étape.
 function Step($msg) { Write-Host "`n==> $msg" -ForegroundColor Cyan }
 
+# Lance un programme externe et s'arrête s'il échoue (PowerShell ne le fait pas
+# tout seul pour les programmes natifs).
 function Invoke-Native {
     param([string]$Exe, [string[]]$Arguments)
     & $Exe @Arguments
     if ($LASTEXITCODE -ne 0) { throw "$Exe a échoué (code $LASTEXITCODE)" }
 }
 
+# Vérifie qu'un outil est installé, sinon explique où le trouver.
 function Require($name, $hint) {
     if (-not (Get-Command $name -ErrorAction SilentlyContinue)) {
         throw "$name introuvable. $hint"
@@ -31,6 +46,7 @@ Require 'npm'  'npm est fourni avec Node.js.'
 Write-Host ("  " + (go version))
 Write-Host ("  node " + (node --version))
 
+# Les outils installés par « go install » (dont wails3) atterrissent ici.
 $GoBin = Join-Path (go env GOPATH) 'bin'
 if ($env:Path -notlike "*$GoBin*") { $env:Path = "$GoBin;$env:Path" }
 
@@ -51,7 +67,8 @@ if (-not (Test-Path (Join-Path $App 'main.go'))) {
 
 Step 'Tor Browser à embarquer'
 # Trop lourd pour le zip des sources : récupéré sur le site officiel de Tor.
-# Sa signature est vérifiée par Aria avant toute installation.
+# Sa signature PGP est vérifiée par Aria avant toute installation (et, sur
+# GitHub, avant même la compilation).
 $TorVersion = '15.0.24'
 $TorAssets  = Join-Path $Src 'internal\torbrowser\assets'
 $TorExe     = Join-Path $TorAssets 'tor-browser-portable.exe'
@@ -97,6 +114,7 @@ try {
 
 $Exe = Join-Path $App 'bin\aria-shield.exe'
 if (-not (Test-Path $Exe)) { throw "Compilation terminée mais $Exe est introuvable." }
+# Wails nomme l'exe d'après le module Go ; on le renomme pour la diffusion.
 Copy-Item $Exe (Join-Path $Root 'Aria-Shield.exe') -Force
 
 Step 'Terminé'

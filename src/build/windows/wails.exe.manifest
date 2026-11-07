@@ -6,6 +6,7 @@
             <assemblyIdentity type="win32" name="Microsoft.Windows.Common-Controls" version="6.0.0.0" processorArchitecture="*" publicKeyToken="6595b64144ccf1df" language="*"/>
         </dependentAssembly>
     </dependency>
+    <!-- Netteté sur les écrans à haute densité, y compris quand on change d'écran -->
     <asmv3:application>
         <asmv3:windowsSettings>
             <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">true/pm</dpiAware>
@@ -15,7 +16,7 @@
     <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
         <security>
             <requestedPrivileges>
-                <!-- Aria Shield modifie le DNS, le pare-feu et des services : droits admin requis au lancement -->
+                <!-- Aria Shield règle le DNS, le pare-feu et le pilote WireGuard : droits admin requis au lancement -->
                 <requestedExecutionLevel level="requireAdministrator" uiAccess="false"/>
             </requestedPrivileges>
         </security>

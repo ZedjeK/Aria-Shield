@@ -6,11 +6,12 @@ Aria-Shield.exe
 *.exe.part*
 
 # Tor Browser embarqué (113 Mo, au-delà de la limite GitHub de 100 Mo) :
-# build.ps1 le télécharge sur dist.torproject.org avant de compiler
+# build.ps1 le télécharge sur torproject.org (ou son archive) avant de compiler
 src/internal/torbrowser/assets/tor-browser-portable.exe
 src/internal/torbrowser/assets/tor-browser-portable.exe.asc
 
-# Données locales d'Aria (profil VPN chiffré, photo DNS, Tor Browser extrait)
+# Ancien dossier de données des versions 0.6.1 et avant, créé à côté de l'exe
+# (Aria le déplace depuis dans AppData et ProgramData)
 AriaShield-data/
 
 # Frontend
