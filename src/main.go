@@ -11,8 +11,11 @@ package main
 import (
 	"embed"
 	"log"
+	"os"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
+
+	"aria-shield/internal/torbrowser"
 )
 
 // L'interface compilée par Vite est embarquée dans l'exe : rien n'est chargé
@@ -24,6 +27,12 @@ var assets embed.FS
 // main démarre Aria. À la fermeture, Wails appelle ServiceShutdown, qui remet
 // la connexion de Windows comme avant.
 func main() {
+	// Assistant Tor : le même exe, relancé par Aria sans droits administrateur
+	// pour installer ou mettre à jour Tor Browser (voir internal/torbrowser).
+	if len(os.Args) > 1 && os.Args[1] == torbrowser.HelperArg {
+		os.Exit(torbrowser.RunHelper(os.Args[2:]))
+	}
+
 	app := application.New(application.Options{
 		Name:        "Aria Shield",
 		Description: "Navigation discrète : DNS local Unbound, VPN et Tor",

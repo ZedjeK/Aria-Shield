@@ -65,7 +65,7 @@ Aria ne dépose rien à côté de l'exe. Tout va dans deux dossiers :
 | Dossier | Contenu | Accès |
 | --- | --- | --- |
 | `%LOCALAPPDATA%\AriaShield` | Tes données : profils VPN chiffrés, Tor Browser et ses favoris | Ton compte |
-| `%PROGRAMDATA%\AriaShield` | Ce qu'Aria exécute en administrateur (Unbound, installeurs de Tor Browser) et la photo de ton DNS d'origine | Administrateurs et système uniquement |
+| `%PROGRAMDATA%\AriaShield` | Ce qu'Aria exécute en administrateur (Unbound) et la photo de ton DNS d'origine | Administrateurs et système uniquement |
 
 Le second est créé déjà verrouillé, pour qu'aucun programme sans droits admin ne puisse y glisser un faux exécutable ou une DLL qu'Aria lancerait ensuite. S'il existe déjà sans avoir été créé par Aria (propriétaire inattendu, ou lien vers un autre dossier), il est mis de côté sous le nom `AriaShield.suspect-<date>` et remplacé par un dossier neuf ; Aria te prévient au lancement. Si le verrouillage échoue, Aria refuse de lancer Unbound.
 
@@ -94,7 +94,7 @@ Pour revenir à la normale à tout moment : « restaurer --tout », en bas de la
 - **Profils VPN chiffrés** avec DPAPI, liés à ton compte Windows. Les clés ne quittent jamais la partie Go d'Aria : l'interface ne les reçoit pas, même pour les afficher. À l'import d'un `.conf`, c'est Aria qui lit le fichier ; les commandes qu'il pourrait contenir (`PostUp`…) sont ignorées, jamais exécutées.
 - **Aucune fuite pendant une bascule** : changer de serveur garde la même carte réseau et le même kill switch ; si le nouveau serveur ne répond pas, Aria revient sur l'ancien.
 - **Composants vérifiés** : chaque binaire embarqué vient de la source officielle, avec sa signature vérifiée (voir plus bas). Aria revérifie leur empreinte ou leur signature avant chaque utilisation.
-- **Tor Browser jamais en administrateur** : Aria tourne en admin, mais lance Tor Browser avec tes droits normaux.
+- **Tor Browser jamais en administrateur** : Aria tourne en admin, mais installe, met à jour et lance Tor Browser avec tes droits normaux. L'installation et les mises à jour passent par un assistant (le même exe, relancé sans élévation) : Aria ne fait que lire le dossier de Tor Browser, si bien qu'un programme sans droits ne peut pas s'en servir pour faire écrire Aria ailleurs sur le disque.
 
 ### Limites à connaître
 

@@ -10,3 +10,6 @@ var errWindowsOnly = errors.New("disponible uniquement sous Windows")
 func runInstaller(installer, target string) error { return errWindowsOnly }
 func running(dir string) bool                     { return false }
 func launchUnelevated(exe, dir string) error      { return errWindowsOnly }
+
+// runHelper : hors Windows, pas d'élévation à quitter, l'opération se fait sur place.
+func (m *Manager) runHelper(op, version string) error { return m.helperOp(op, version) }

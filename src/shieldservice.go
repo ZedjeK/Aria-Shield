@@ -112,7 +112,7 @@ func NewShieldService() *ShieldService {
 	s.sys = sysdns.New(sysDir)
 	s.sys.Exclude(vpn.AdapterName) // la carte VPN est configurée par le tunnel lui-même
 	s.store = vpn.NewStore(userDir)
-	s.tor = torbrowser.New(userDir, sysDir)
+	s.tor = torbrowser.New(userDir)
 
 	// Filets de sécurité si Unbound s'arrête tout seul.
 	s.dns.OnUnexpectedExit(func() {

@@ -1,6 +1,6 @@
 // Package paths décide où Aria range ses fichiers :
 //   - %LOCALAPPDATA%\AriaShield : données de l'utilisateur (profils VPN chiffrés, Tor Browser) ;
-//   - %PROGRAMDATA%\AriaShield : ce qu'Aria exécute en administrateur (Unbound, installeurs)
+//   - %PROGRAMDATA%\AriaShield : ce qu'Aria exécute en administrateur (Unbound)
 //     et l'état système (photo du DNS), dans un dossier où seuls les administrateurs
 //     et le système peuvent écrire.
 package paths
