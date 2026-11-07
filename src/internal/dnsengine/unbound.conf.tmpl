@@ -1,33 +1,45 @@
 # Généré par Aria Shield à chaque démarrage : les modifications manuelles seront écrasées.
+# Les repères entre doubles accolades sont remplacés par RenderConfig (engine.go).
 server:
     verbosity: 1
     port: 53
+    # Boucle locale uniquement : Unbound ne répond qu'aux programmes de ce PC.
     interface: 127.0.0.1
     access-control: 127.0.0.0/8 allow
+    # Écoute sur la boucle locale IPv6 ajoutée ici si la machine la permet.
 {{IPV6}}
     directory: "{{DIR}}"
     logfile: "{{DIR}}/unbound.log"
     use-syslog: no
 
     # Vie privée
+    # Chaque serveur ne reçoit que la partie du nom qui le concerne
+    # (la racine voit « .com », pas « www.exemple.com »).
     qname-minimisation: yes
+    # Ne révèle ni le nom de la machine ni la version d'Unbound.
     hide-identity: yes
     hide-version: yes
 
     # Durcissement et DNSSEC
+    # Ignore les adresses « collées » hors du domaine interrogé (empoisonnement).
     harden-glue: yes
+    # Refuse une réponse dont les signatures DNSSEC auraient été retirées en route.
     harden-dnssec-stripped: yes
+    # Un domaine inexistant prouvé par DNSSEC rend inexistants ses sous-domaines.
     harden-below-nxdomain: yes
+    # Réutilise les preuves de non-existence signées : moins de requêtes sortantes.
     aggressive-nsec: yes
+    # Ancre de confiance racine, tenue à jour par Unbound lui-même (RFC 5011).
     auto-trust-anchor-file: "{{DIR}}/root.key"
 
-    # Confort
+    # Confort : rafraîchit les noms populaires juste avant leur expiration.
     prefetch: yes
 
     # Marqueur : prouve que Windows passe bien par ce résolveur
     local-zone: "aria-shield.test." static
     local-data: "check.aria-shield.test. 60 IN A 192.0.2.53"
 
+# Pas de canal de commande à distance : personne ne peut piloter Unbound.
 remote-control:
     control-enable: no
 

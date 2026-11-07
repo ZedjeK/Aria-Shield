@@ -2,6 +2,10 @@
 
 package sysdns
 
+// Partie Windows : lecture des cartes et réglage de leurs DNS par PowerShell
+// (les cmdlets DnsClient/NetAdapter), et accès direct au registre quand une
+// carte n'est plus là pour recevoir la commande.
+
 import (
 	"encoding/json"
 	"errors"
@@ -15,13 +19,19 @@ import (
 )
 
 const (
-	psTimeout  = 30 * time.Second
+	psTimeout = 30 * time.Second
+	// Stratégie « Désactiver la résolution de noms multi-cartes intelligente ».
+	// Sans elle, Windows interroge en parallèle les DNS de toutes les cartes et
+	// garde la réponse la plus rapide : celle du FAI pourrait passer avant Aria.
 	policyKey  = `SOFTWARE\Policies\Microsoft\Windows NT\DNSClient`
 	policyName = "DisableSmartNameResolution"
 	tcpip4Key  = `SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces\`
 	tcpip6Key  = `SYSTEM\CurrentControlSet\Services\Tcpip6\Parameters\Interfaces\`
 )
 
+// listScript liste les cartes actives en JSON. Pour chacune : les DNS fixés à
+// la main (lus dans le registre, vides si DNS automatique) et les serveurs
+// réellement utilisés à cet instant.
 const listScript = `
 $ErrorActionPreference = 'Stop'
 $out = foreach ($a in @(Get-NetAdapter | Where-Object { $_.Status -eq 'Up' })) {
@@ -34,6 +44,7 @@ $out = foreach ($a in @(Get-NetAdapter | Where-Object { $_.Status -eq 'Up' })) {
 if ($null -eq $out) { '[]' } else { ConvertTo-Json -InputObject @($out) -Depth 4 -Compress }
 `
 
+// rawAdapter est une carte telle que la décrit listScript.
 type rawAdapter struct {
 	Index    int      `json:"index"`
 	Alias    string   `json:"alias"`
@@ -48,6 +59,7 @@ func splitServers(s string) []string {
 	return strings.FieldsFunc(s, func(r rune) bool { return r == ',' || r == ' ' || r == ';' })
 }
 
+// listAdapters renvoie les cartes réseau actives et leur configuration DNS.
 func listAdapters() ([]Adapter, error) {
 	out, err := sysx.PowerShell(psTimeout, listScript)
 	if err != nil {
@@ -85,6 +97,8 @@ func psList(items []string) string {
 	return "@(" + strings.Join(quoted, ",") + ")"
 }
 
+// pointToLoopback fait utiliser à une carte le résolveur local (127.0.0.1, et
+// ::1 si Unbound écoute en IPv6).
 func pointToLoopback(index int, ipv6 bool) error {
 	list := []string{loopback4}
 	if ipv6 {
@@ -143,6 +157,8 @@ func restoreAdapter(a Adapter) (string, error) {
 	return note + " (via le registre)", nil
 }
 
+// writeNameServer écrit la valeur NameServer d'une carte dans le registre.
+// Une clé absente (carte jamais configurée pour cette famille) n'est pas une erreur.
 func writeNameServer(path, value string) error {
 	k, err := registry.OpenKey(registry.LOCAL_MACHINE, path, registry.SET_VALUE)
 	if err != nil {
@@ -155,6 +171,7 @@ func writeNameServer(path, value string) error {
 	return k.SetStringValue("NameServer", value)
 }
 
+// smartResolutionPolicy lit la stratégie actuelle : existe-t-elle, et avec quelle valeur.
 func smartResolutionPolicy() (bool, uint32, error) {
 	k, err := registry.OpenKey(registry.LOCAL_MACHINE, policyKey, registry.QUERY_VALUE)
 	if err != nil {
@@ -174,6 +191,7 @@ func smartResolutionPolicy() (bool, uint32, error) {
 	return true, uint32(v), nil
 }
 
+// setSmartResolutionOff force Windows à n'interroger que le DNS de la carte prioritaire.
 func setSmartResolutionOff() error {
 	k, _, err := registry.CreateKey(registry.LOCAL_MACHINE, policyKey, registry.SET_VALUE)
 	if err != nil {
@@ -183,6 +201,8 @@ func setSmartResolutionOff() error {
 	return k.SetDWordValue(policyName, 1)
 }
 
+// restoreSmartResolution remet la stratégie comme avant : sa valeur d'origine,
+// ou son absence.
 func restoreSmartResolution(existed bool, value uint32) error {
 	k, err := registry.OpenKey(registry.LOCAL_MACHINE, policyKey, registry.SET_VALUE)
 	if err != nil {
@@ -201,10 +221,13 @@ func restoreSmartResolution(existed bool, value uint32) error {
 	return nil
 }
 
+// flushCache vide le cache DNS de Windows, pour que le changement prenne effet
+// tout de suite plutôt qu'à l'expiration des anciennes réponses.
 func flushCache() {
 	_, _ = sysx.PowerShell(psTimeout, `Clear-DnsClientCache`)
 }
 
+// firstLine garde la première ligne d'une sortie PowerShell (le message d'erreur utile).
 func firstLine(s string) string {
 	s = strings.TrimSpace(s)
 	if i := strings.IndexByte(s, '\n'); i >= 0 {

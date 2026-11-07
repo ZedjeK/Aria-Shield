@@ -4,6 +4,7 @@ package torbrowser
 
 import "errors"
 
+// Hors Windows (développement et tests) : ni installeur ni lancement.
 var errWindowsOnly = errors.New("disponible uniquement sous Windows")
 
 func runInstaller(installer, target string) error { return errWindowsOnly }

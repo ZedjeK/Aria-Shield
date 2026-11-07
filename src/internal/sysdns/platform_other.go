@@ -2,6 +2,8 @@
 
 package sysdns
 
+// Hors Windows (développement et tests) : aucune carte à régler.
+
 import "errors"
 
 var errWindowsOnly = errors.New("disponible uniquement sous Windows")

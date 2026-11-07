@@ -7,6 +7,7 @@ import (
 	"os/exec"
 )
 
+// hideWindow : pas de console à masquer hors Windows.
 func hideWindow(cmd *exec.Cmd) {}
 
 // IsAdmin : hors Windows (dev uniquement), on regarde si on est root.

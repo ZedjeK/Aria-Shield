@@ -21,8 +21,10 @@ import (
 )
 
 const (
-	tunnelType = "Aria Shield"
-	tunnelMTU  = 1420
+	tunnelType = "Aria Shield" // type de carte affiché par Windows
+	// 1420 = 1500 (Ethernet) moins l'en-tête WireGuard sur IPv6 (80 octets) :
+	// la valeur par défaut de WireGuard, qui évite la fragmentation.
+	tunnelMTU = 1420
 )
 
 // GUID fixe : Windows reconnaît la carte « Aria » d'une session à l'autre.
@@ -31,11 +33,11 @@ var adapterGUID = windows.GUID{Data1: 0x41524941, Data2: 0x5348, Data3: 0x4c44, 
 // Tunnel pilote la carte WireGuard d'Aria.
 type Tunnel struct {
 	mu       sync.Mutex
-	adapter  *driver.Adapter
-	luid     winipcfg.LUID
-	full     bool
-	firewall bool
-	endpoint string
+	adapter  *driver.Adapter // nil quand le tunnel est fermé
+	luid     winipcfg.LUID   // identifiant de la carte pour les API réseau de Windows
+	full     bool            // tout le trafic passe dans le tunnel
+	firewall bool            // le kill switch (filtres WFP) est posé
+	endpoint string          // serveur actuel, pour l'affichage
 }
 
 // NewTunnel prépare le pilote du tunnel (rien n'est lancé).
@@ -138,6 +140,9 @@ func (t *Tunnel) Up(p Profile, full bool, dns4, dns6 []netip.Addr) (err error) {
 		return fmt.Errorf("configuration du tunnel refusée : %w", err)
 	}
 
+	// Ordre important : configuration WireGuard, puis adresses et routes, puis
+	// carte allumée, et seulement après le kill switch, qui laisse passer le
+	// trafic de la carte « Aria » et bloque tout le reste.
 	t.luid = adapter.LUID()
 	if err = configureFamily(t.luid, windows.AF_INET, cfg, full, dns4); err != nil {
 		return err
@@ -259,6 +264,8 @@ func (t *Tunnel) Down() {
 	t.downLocked()
 }
 
+// downLocked démonte dans l'ordre inverse de Up : kill switch d'abord, puis la
+// carte, puis le pilote. L'appelant doit tenir t.mu.
 func (t *Tunnel) downLocked() {
 	if t.firewall {
 		killswitch.DisableFirewall()

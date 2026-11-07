@@ -1,5 +1,17 @@
 // Package dnsengine embarque Unbound (version portable officielle) et le fait
 // tourner comme processus enfant d'Aria Shield : rien n'est installé sur la machine.
+//
+// Cycle de vie :
+//
+//	New(dir)  → rien ne tourne encore
+//	Start()   → extraction d'unbound.exe (empreinte vérifiée), clé racine DNSSEC,
+//	            config, vérification du port 53, lancement, attente de la 1re réponse
+//	Test()    → résolution d'un domaine normal + rejet d'un domaine à DNSSEC cassé
+//	Stop()    → arrêt volontaire (un arrêt imprévu déclenche OnUnexpectedExit)
+//
+// Unbound est un résolveur récursif : il interroge lui-même les serveurs racine
+// puis ceux de chaque domaine, sans passer par le DNS du FAI ni par un DNS tiers.
+// C'est ce qui le rend insensible aux blocages DNS imposés aux FAI.
 package dnsengine
 
 import (
@@ -46,11 +58,13 @@ const (
 )
 
 const (
-	listenAddr   = "127.0.0.1:53"
-	listenAddr6  = "[::1]:53"
+	listenAddr   = "127.0.0.1:53" // Unbound n'écoute que sur la boucle locale :
+	listenAddr6  = "[::1]:53"     // jamais joignable depuis le réseau
 	startTimeout = 12 * time.Second
 	probeTimeout = 3 * time.Second
-	testDomain   = "example.com"
+	testDomain   = "example.com" // domaine réservé (RFC 2606), toujours résolu
+	// Domaine volontairement signé de travers : un résolveur qui valide DNSSEC
+	// doit refuser de le résoudre (SERVFAIL).
 	brokenDNSSEC = "dnssec-failed.org"
 )
 
@@ -70,13 +84,13 @@ type TestResult struct {
 
 // Engine pilote le processus unbound.exe.
 type Engine struct {
-	mu       sync.Mutex
-	dataDir  string
-	cmd      *exec.Cmd
-	done     chan struct{}
-	ipv6     bool
-	stopping bool
-	onExit   func()
+	mu       sync.Mutex    // protège tous les champs ci-dessous
+	dataDir  string        // dossier verrouillé (administrateurs seulement) où vit Unbound
+	cmd      *exec.Cmd     // processus en cours, nil avant le premier Start
+	done     chan struct{} // fermé quand le processus s'est terminé
+	ipv6     bool          // Unbound écoute aussi sur ::1
+	stopping bool          // arrêt demandé par Aria : ce n'est pas un plantage
+	onExit   func()        // appelé si Unbound s'arrête tout seul
 }
 
 // OnUnexpectedExit enregistre une fonction appelée si Unbound s'arrête
@@ -101,6 +115,7 @@ func New(dir string) *Engine { return &Engine{dataDir: dir} }
 // DataDir renvoie le dossier d'Unbound.
 func (e *Engine) DataDir() string { return e.dataDir }
 
+// dataDirLocked est DataDir pour un appelant qui tient déjà e.mu.
 func (e *Engine) dataDirLocked() string { return e.dataDir }
 
 // Running indique si unbound.exe tourne.
@@ -110,6 +125,8 @@ func (e *Engine) Running() bool {
 	return e.runningLocked()
 }
 
+// runningLocked regarde, sans bloquer, si le canal done est déjà fermé.
+// L'appelant doit tenir e.mu.
 func (e *Engine) runningLocked() bool {
 	if e.done == nil {
 		return false
@@ -196,6 +213,9 @@ func (e *Engine) prepare(add func(string, bool, string)) (exePath, confPath stri
 	return exePath, confPath, nil
 }
 
+// extractUnbound décompresse l'unbound.exe embarqué dans dst. Le fichier est
+// d'abord écrit à côté (.tmp) en calculant son empreinte, et ne prend la place
+// de dst que si cette empreinte est exactement celle attendue.
 func extractUnbound(dst string) error {
 	zr, err := gzip.NewReader(bytes.NewReader(unboundGz))
 	if err != nil {
@@ -226,25 +246,14 @@ func extractUnbound(dst string) error {
 	return os.Rename(tmp, dst)
 }
 
-func fileSHA256(path string) string {
-	f, err := os.Open(path)
-	if err != nil {
-		return ""
-	}
-	defer f.Close()
-	h := sha256.New()
-	if _, err := io.Copy(h, f); err != nil {
-		return ""
-	}
-	return hex.EncodeToString(h.Sum(nil))
-}
-
 // portFree vérifie que personne n'écoute déjà sur le port 53 de la boucle locale.
 func portFree(ipv6 bool) error {
 	addrs := [][2]string{{"udp4", listenAddr}, {"tcp4", listenAddr}}
 	if ipv6 {
 		addrs = append(addrs, [2]string{"udp6", listenAddr6}, [2]string{"tcp6", listenAddr6})
 	}
+	// On tente d'ouvrir chaque port nous-mêmes, puis on le relâche aussitôt :
+	// si l'ouverture échoue, un autre programme l'occupe déjà.
 	for _, a := range addrs {
 		if a[0][:3] == "udp" {
 			c, err := net.ListenPacket(a[0], a[1])
@@ -316,6 +325,9 @@ func (e *Engine) Start() ([]Step, error) {
 		add("Liaison au processus Aria", false, err.Error())
 	}
 
+	// Surveillance du processus : quand il se termine, on ferme done, puis on
+	// prévient Aria si personne n'avait demandé l'arrêt (plantage, processus
+	// tué…), pour qu'elle remette le DNS de Windows comme avant.
 	done := make(chan struct{})
 	e.stopping = false
 	go func() {
@@ -379,6 +391,8 @@ func (e *Engine) Stop() {
 	e.stopLocked()
 }
 
+// stopLocked tue Unbound et attend au plus 5 s qu'il soit vraiment terminé.
+// L'appelant doit tenir e.mu.
 func (e *Engine) stopLocked() {
 	if !e.runningLocked() {
 		return
@@ -410,6 +424,8 @@ func (e *Engine) Test() TestResult {
 		return res
 	}
 
+	// Un résolveur qui valide DNSSEC doit répondre SERVFAIL ici ; une vraie
+	// réponse prouverait que les signatures ne sont pas vérifiées.
 	bad, err := Query(listenAddr, brokenDNSSEC, probeTimeout*2)
 	switch {
 	case err != nil:

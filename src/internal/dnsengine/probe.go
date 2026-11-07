@@ -1,5 +1,9 @@
 package dnsengine
 
+// Petit client DNS fait main, juste ce qu'il faut pour tester le résolveur :
+// une question de type A, et la lecture de l'en-tête de la réponse (code de
+// retour et nombre de réponses). Pas besoin d'une bibliothèque DNS complète.
+
 import (
 	"crypto/rand"
 	"encoding/binary"
@@ -19,11 +23,13 @@ const (
 
 // Answer résume une réponse DNS.
 type Answer struct {
-	Rcode   int
-	Answers int
+	Rcode   int // RcodeNoError, RcodeServFail, RcodeNXDomain…
+	Answers int // nombre d'enregistrements dans la section réponse
 }
 
 // buildQuery fabrique une requête DNS de type A, récursion demandée.
+// Format (RFC 1035) : en-tête de 12 octets, puis le nom découpé en labels
+// préfixés par leur longueur (« example.com » → 7 example 3 com 0).
 func buildQuery(id uint16, name string) ([]byte, error) {
 	name = strings.TrimSuffix(name, ".")
 	if name == "" {
@@ -54,16 +60,18 @@ func parseHeader(id uint16, resp []byte) (Answer, error) {
 	if binary.BigEndian.Uint16(resp[0:2]) != id {
 		return Answer{}, errors.New("identifiant de réponse inattendu")
 	}
+	// Bit QR (premier bit de l'octet 2) : 1 pour une réponse, 0 pour une question.
 	if resp[2]&0x80 == 0 {
 		return Answer{}, errors.New("le paquet reçu n'est pas une réponse")
 	}
 	return Answer{
-		Rcode:   int(resp[3] & 0x0F),
+		Rcode:   int(resp[3] & 0x0F), // 4 bits de poids faible de l'octet 3
 		Answers: int(binary.BigEndian.Uint16(resp[6:8])),
 	}, nil
 }
 
 // Query envoie une requête A au serveur donné (ex. "127.0.0.1:53").
+// L'identifiant est tiré au hasard : une réponse qui ne le reprend pas est rejetée.
 func Query(server, name string, timeout time.Duration) (Answer, error) {
 	var idb [2]byte
 	if _, err := rand.Read(idb[:]); err != nil {

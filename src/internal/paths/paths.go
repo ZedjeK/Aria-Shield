@@ -1,5 +1,5 @@
 // Package paths décide où Aria range ses fichiers :
-//   - %LOCALAPPDATA%\AriaShield : données de l'utilisateur (profil VPN chiffré, Tor Browser) ;
+//   - %LOCALAPPDATA%\AriaShield : données de l'utilisateur (profils VPN chiffrés, Tor Browser) ;
 //   - %PROGRAMDATA%\AriaShield : ce qu'Aria exécute en administrateur (Unbound, installeurs)
 //     et l'état système (photo du DNS), dans un dossier où seuls les administrateurs
 //     et le système peuvent écrire.
@@ -10,11 +10,13 @@ import (
 	"path/filepath"
 )
 
+// appDir est le nom du dossier d'Aria dans LOCALAPPDATA et PROGRAMDATA.
 const appDir = "AriaShield"
 
 // LegacyDirName est l'ancien dossier, créé à côté de l'exe jusqu'à la v0.6.1.
 const LegacyDirName = "AriaShield-data"
 
+// envOr lit une variable d'environnement, avec une valeur de repli (tests hors Windows).
 func envOr(name, fallback string) string {
 	if v := os.Getenv(name); v != "" {
 		return v

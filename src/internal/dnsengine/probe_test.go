@@ -1,10 +1,28 @@
 package dnsengine
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"io"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
+
+// fileSHA256 renvoie l'empreinte d'un fichier (vide si illisible).
+func fileSHA256(path string) string {
+	f, err := os.Open(path)
+	if err != nil {
+		return ""
+	}
+	defer f.Close()
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return ""
+	}
+	return hex.EncodeToString(h.Sum(nil))
+}
 
 func TestBuildQuery(t *testing.T) {
 	q, err := buildQuery(0xBEEF, "example.com.")

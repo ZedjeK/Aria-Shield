@@ -1,6 +1,14 @@
 // Package torbrowser installe, met à jour et lance Tor Browser (version portable
 // officielle) dans le dossier d'Aria. Chaque fichier est vérifié par signature PGP
 // avec la clé des développeurs de Tor Browser avant d'être exécuté.
+//
+// Parcours type, piloté par l'interface (page Mode Fantôme) :
+//
+//	EnsureInstalled  au premier lancement, installe la version embarquée dans l'exe
+//	CheckUpdate      compare avec l'index officiel de Tor (aus1.torproject.org)
+//	Update           télécharge, vérifie la signature, installe à côté, reprend
+//	                 les favoris et réglages, puis remplace l'ancienne version
+//	Launch           démarre Tor Browser sans les droits administrateur d'Aria
 package torbrowser
 
 import (

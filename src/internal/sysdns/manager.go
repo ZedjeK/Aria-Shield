@@ -1,5 +1,17 @@
 // Package sysdns fait pointer le DNS de Windows sur le résolveur local d'Aria,
 // et garantit le retour à la configuration d'origine quoi qu'il arrive.
+//
+// Le principe tient en une règle : photographier avant de toucher.
+//
+//  1. Enable photographie chaque carte réseau active (DNS automatique ou
+//     serveurs fixes) et la stratégie « résolution multi-cartes », écrit cette
+//     photo sur disque, et seulement ensuite fait pointer les cartes sur 127.0.0.1.
+//  2. Pendant que c'est actif, watch repasse toutes les 10 s : une nouvelle
+//     carte (Wi-Fi, partage de connexion…) est photographiée puis alignée, une
+//     carte modifiée par Windows est remise sur Aria.
+//  3. Disable remet tout comme sur la photo, puis efface la photo.
+//  4. Si Aria a planté, la photo est restée sur disque : RecoverLeftover
+//     la retrouve au lancement suivant et restaure.
 package sysdns
 
 import (
@@ -16,7 +28,7 @@ import (
 )
 
 const (
-	backupName    = "dns-backup.json"
+	backupName    = "dns-backup.json" // la photo, dans le dossier système verrouillé
 	watchInterval = 10 * time.Second
 	loopback4     = "127.0.0.1"
 	loopback6     = "::1"
@@ -114,6 +126,9 @@ func (m *Manager) LastEvent() string {
 	return m.event
 }
 
+// save écrit la photo de façon atomique : fichier temporaire synchronisé sur le
+// disque, puis renommage. Une coupure de courant laisse l'ancienne photo ou la
+// nouvelle, jamais un fichier à moitié écrit.
 func (m *Manager) save() error {
 	data, err := json.MarshalIndent(m.backup, "", "  ")
 	if err != nil {
@@ -138,6 +153,7 @@ func (m *Manager) save() error {
 	return os.Rename(tmp, m.path)
 }
 
+// allowed indique si un serveur DNS est le résolveur local d'Aria.
 func allowed(server string, ipv6 bool) bool {
 	return server == loopback4 || (ipv6 && server == loopback6)
 }
@@ -225,6 +241,7 @@ func (m *Manager) Enable(ipv6 bool) ([]Step, error) {
 	return steps, nil
 }
 
+// servers décrit, pour le journal, les adresses posées sur les cartes.
 func servers(ipv6 bool) string {
 	if ipv6 {
 		return loopback4 + ", " + loopback6
@@ -239,6 +256,9 @@ func (m *Manager) Disable(reason string) []Step {
 	return m.restoreLocked(reason)
 }
 
+// restoreLocked remet chaque carte et la stratégie comme sur la photo.
+// L'appelant doit tenir m.mu. reason, s'il n'est pas vide, est affiché à
+// l'utilisateur (restauration automatique après un incident).
 func (m *Manager) restoreLocked(reason string) []Step {
 	var steps []Step
 	add := func(label string, ok bool, note string) { steps = append(steps, Step{label, ok, note}) }
@@ -317,6 +337,9 @@ func (m *Manager) watch(stop chan struct{}) {
 	}
 }
 
+// realign est un passage de surveillance. La liste des cartes est lue sans
+// verrou (PowerShell est lent), puis on vérifie que la protection est toujours
+// active et que ce passage appartient bien à la session en cours (stop).
 func (m *Manager) realign(stop chan struct{}) {
 	adapters, err := listAdapters()
 	if err != nil {
@@ -391,6 +414,7 @@ func CheckMarker(name, want string) (bool, string) {
 	return false, "réponse inattendue : " + strings.Join(got, ", ")
 }
 
+// shortErr traduit les erreurs de résolution les plus courantes.
 func shortErr(err error) string {
 	var dnsErr *net.DNSError
 	if errors.As(err, &dnsErr) {

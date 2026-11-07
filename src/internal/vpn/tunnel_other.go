@@ -2,6 +2,8 @@
 
 package vpn
 
+// Hors Windows (développement et tests) : pas de tunnel possible.
+
 import (
 	"net/netip"
 	"time"

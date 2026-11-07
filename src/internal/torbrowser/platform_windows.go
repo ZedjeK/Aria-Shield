@@ -66,6 +66,7 @@ func running(dir string) bool {
 	return false
 }
 
+// Fonctions Win32 absentes du paquet golang.org/x/sys/windows, chargées à la demande.
 var (
 	user32                  = windows.NewLazySystemDLL("user32.dll")
 	procGetShellWindow      = user32.NewProc("GetShellWindow")
@@ -87,6 +88,10 @@ func launchUnelevated(exe, dir string) error {
 	return nil
 }
 
+// launchWithShellToken lance exe avec une copie du jeton du processus qui
+// possède le bureau (l'Explorateur), donc au nom de l'utilisateur et sans
+// élévation, même si Aria tourne en administrateur. C'est la méthode
+// recommandée par Microsoft pour « dé-élever » un lancement.
 func launchWithShellToken(exe, dir string) error {
 	hwnd, _, _ := procGetShellWindow.Call()
 	if hwnd == 0 {

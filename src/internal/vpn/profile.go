@@ -1,5 +1,16 @@
-// Package vpn gère le profil WireGuard saisi par l'utilisateur et le tunnel
-// (pilote officiel WireGuardNT), avec le kill switch.
+// Package vpn gère les profils WireGuard de l'utilisateur et le tunnel (pilote
+// officiel WireGuardNT), avec le kill switch.
+//
+// Organisation :
+//
+//	profile.go          un profil, sa validation et sa vue sans secret
+//	conf.go             lecture d'un fichier .conf (format wg-quick)
+//	book.go             le carnet de profils, chiffré DPAPI sur le disque
+//	tunnel_windows.go   ouverture, bascule et fermeture du tunnel
+//	protect_*.go        chiffrement DPAPI (Windows) ou refus (ailleurs)
+//
+// Règle d'or : aucune clé privée ou partagée ne sort de ce paquet vers
+// l'interface. Le frontend ne reçoit que des View.
 package vpn
 
 import (
@@ -12,8 +23,9 @@ import (
 	"strings"
 )
 
-// Profile est la configuration WireGuard saisie à la main.
-// AllowedIPs n'en fait pas partie : Aria impose le tunnel complet.
+// Profile est une configuration WireGuard complète, clés comprises : elle ne
+// quitte jamais le Go. AllowedIPs n'en fait pas partie : Aria impose le tunnel
+// complet (tout le trafic, IPv4 et IPv6).
 type Profile struct {
 	ID           string   `json:"id"`
 	Name         string   `json:"name"`
@@ -55,6 +67,7 @@ type Input struct {
 // FieldErrors associe un champ du formulaire à un message en français.
 type FieldErrors map[string]string
 
+// Error assemble les messages en une seule ligne (pour les journaux).
 func (f FieldErrors) Error() string {
 	parts := make([]string, 0, len(f))
 	for k, v := range f {
@@ -63,6 +76,7 @@ func (f FieldErrors) Error() string {
 	return strings.Join(parts, " ; ")
 }
 
+// checkKey vérifie qu'une clé WireGuard est bien 32 octets encodés en base64.
 func checkKey(s string) error {
 	s = strings.TrimSpace(s)
 	if s == "" {
@@ -75,6 +89,8 @@ func checkKey(s string) error {
 	return nil
 }
 
+// splitList découpe une liste saisie librement (virgules, points-virgules,
+// espaces ou retours à la ligne).
 func splitList(s string) []string {
 	var out []string
 	for _, p := range strings.FieldsFunc(s, func(r rune) bool { return r == ',' || r == ';' || r == ' ' || r == '\n' }) {

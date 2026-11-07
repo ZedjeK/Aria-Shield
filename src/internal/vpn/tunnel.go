@@ -1,5 +1,8 @@
 package vpn
 
+// Types communs à toutes les plateformes ; le tunnel lui-même est dans
+// tunnel_windows.go (et un bouchon dans tunnel_other.go).
+
 import "time"
 
 // AdapterName est le nom de la carte virtuelle créée par Aria.
@@ -7,8 +10,8 @@ const AdapterName = "Aria"
 
 // Stats décrit l'état du tunnel pour l'interface.
 type Stats struct {
-	Up           bool   `json:"up"`
-	Full         bool   `json:"full"` // routes + kill switch
+	Up           bool   `json:"up"`   // la carte « Aria » existe
+	Full         bool   `json:"full"` // routes + kill switch (sinon : simple test de connexion)
 	KillSwitch   bool   `json:"killSwitch"`
 	Endpoint     string `json:"endpoint"`
 	HandshakeAgo int64  `json:"handshakeAgo"` // secondes, -1 si jamais

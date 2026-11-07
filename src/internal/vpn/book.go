@@ -11,6 +11,7 @@ import (
 	"strings"
 )
 
+// Fichiers dans %LOCALAPPDATA%\AriaShield.
 const (
 	booksFile  = "vpn-profiles.bin"
 	legacyFile = "vpn-profile.bin" // un seul profil, jusqu'à la v0.8
@@ -75,6 +76,7 @@ func (b Book) uniqueName(name, selfID string) string {
 	}
 }
 
+// newID tire un identifiant de profil au hasard (12 caractères hexadécimaux).
 func newID() string {
 	b := make([]byte, 6)
 	if _, err := rand.Read(b); err != nil {
@@ -86,8 +88,8 @@ func newID() string {
 // Store range le carnet chiffré (DPAPI) dans le dossier de l'utilisateur.
 type Store struct {
 	dir  string
-	seal func([]byte) ([]byte, error)
-	open func([]byte) ([]byte, error)
+	seal func([]byte) ([]byte, error) // chiffrement (DPAPI ; remplacé dans les tests)
+	open func([]byte) ([]byte, error) // déchiffrement
 }
 
 // NewStore prépare le stockage des profils dans dataDir.
@@ -95,8 +97,10 @@ func NewStore(dataDir string) *Store {
 	return &Store{dir: dataDir, seal: protect, open: unprotect}
 }
 
+// path est le chemin du carnet.
 func (s *Store) path() string { return filepath.Join(s.dir, booksFile) }
 
+// read lit et déchiffre un fichier du dossier des profils.
 func (s *Store) read(name string) ([]byte, error) {
 	data, err := os.ReadFile(filepath.Join(s.dir, name))
 	if err != nil {
@@ -147,6 +151,8 @@ func (s *Store) Load() (Book, error) {
 	return b, nil
 }
 
+// save chiffre le carnet entier et le remplace de façon atomique
+// (fichier temporaire puis renommage), lisible par l'utilisateur seul (0600).
 func (s *Store) save(b Book) error {
 	plain, err := json.Marshal(b)
 	if err != nil {

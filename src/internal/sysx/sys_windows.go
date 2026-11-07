@@ -8,11 +8,13 @@ import (
 	"unsafe"
 )
 
+// Constantes Win32 non exposées par le paquet syscall.
 const (
 	createNoWindow = 0x08000000
 	tokenElevation = 20 // TOKEN_INFORMATION_CLASS.TokenElevation
 )
 
+// hideWindow empêche la fenêtre console de clignoter à chaque commande.
 func hideWindow(cmd *exec.Cmd) {
 	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: createNoWindow}
 }

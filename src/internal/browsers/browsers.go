@@ -18,12 +18,15 @@ type Info struct {
 	Policy bool   `json:"policy"` // réglage imposé par une stratégie
 }
 
+// chromium décrit où un navigateur basé sur Chromium range son réglage DNS.
 type chromium struct {
 	name       string
 	localState string
 	policyKey  string // sous HKLM\SOFTWARE\Policies, vide si aucune
 }
 
+// chromiumBrowsers liste les navigateurs Chromium connus et leurs emplacements
+// par défaut (fichier « Local State » du profil, clé de stratégie d'entreprise).
 func chromiumBrowsers() []chromium {
 	local := os.Getenv("LOCALAPPDATA")
 	roaming := os.Getenv("APPDATA")
@@ -50,6 +53,7 @@ func chromiumMode(data []byte) string {
 	return st.DNS.Mode
 }
 
+// describeChromium traduit le mode DNS de Chromium et dit s'il contourne Aria.
 func describeChromium(mode string) (string, bool) {
 	switch mode {
 	case "secure":
@@ -63,6 +67,7 @@ func describeChromium(mode string) (string, bool) {
 	}
 }
 
+// trrMode repère les réglages DNS via HTTPS (« TRR ») dans le prefs.js de Firefox.
 var trrMode = regexp.MustCompile(`user_pref\("(network\.trr\.mode|doh-rollout\.mode)",\s*(\d+)\)`)
 
 // firefoxMode renvoie le mode TRR le plus contraignant trouvé dans un prefs.js.
@@ -78,6 +83,7 @@ func firefoxMode(prefs []byte) int {
 	return mode
 }
 
+// describeFirefox traduit le mode TRR de Firefox (0 à 5) et dit s'il contourne Aria.
 func describeFirefox(mode int) (string, bool) {
 	switch mode {
 	case 2:

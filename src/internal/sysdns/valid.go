@@ -24,6 +24,7 @@ func canonicalAddrs(items []string) ([]string, error) {
 	return out, nil
 }
 
+// guidRe : forme exacte d'un GUID Windows entre accolades, rien d'autre.
 var guidRe = regexp.MustCompile(`^\{[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}\}$`)
 
 // validGUID vérifie l'identifiant de carte avant de l'accoler à un chemin de registre.

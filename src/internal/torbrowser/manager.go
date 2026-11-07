@@ -31,6 +31,7 @@ const EmbeddedVersion = "15.0.24"
 // Index officiel des versions publiées.
 const indexURL = "https://aus1.torproject.org/torbrowser/update_3/release/downloads.json"
 
+// dirName est le sous-dossier de Tor Browser dans les données de l'utilisateur.
 const dirName = "TorBrowser"
 
 // Progress décrit l'opération en cours, pour la barre de progression.
@@ -77,12 +78,14 @@ func New(userDir, workDir string) *Manager {
 	return &Manager{dir: filepath.Join(userDir, dirName), work: workDir}
 }
 
+// setProgress publie l'avancement ; une phase vide signifie « terminé ».
 func (m *Manager) setProgress(phase string, done, total int64) {
 	m.pmu.Lock()
 	m.progress = Progress{Active: phase != "", Phase: phase, Done: done, Total: total}
 	m.pmu.Unlock()
 }
 
+// firefox est l'exécutable de Tor Browser une fois installé.
 func (m *Manager) firefox() string { return filepath.Join(m.dir, "Browser", "firefox.exe") }
 
 // installedVersion lit Browser\tbb_version.json.
@@ -356,6 +359,7 @@ func keepUserData(oldDir, newDir string) error {
 	})
 }
 
+// copyFile copie un fichier (le dossier de destination doit exister).
 func copyFile(src, dst string) error {
 	in, err := os.Open(src)
 	if err != nil {

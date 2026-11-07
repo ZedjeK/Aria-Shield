@@ -15,6 +15,9 @@ import (
 	"aria-shield/internal/sysx"
 )
 
+// Processus enfants rattachés à Aria (Unbound) : le job est créé une seule
+// fois et reste ouvert tant qu'Aria vit. Quand Windows ferme son dernier
+// handle (fin d'Aria, même par plantage), il tue tout ce qui est dedans.
 var (
 	jobOnce sync.Once
 	job     windows.Handle
@@ -65,7 +68,8 @@ func bindToParent(cmd *exec.Cmd) error {
 	return windows.AssignProcessToJobObject(j, p)
 }
 
-// portOwner tente de nommer le programme qui occupe déjà le port 53.
+// portOwner tente de nommer le programme qui occupe déjà le port 53, pour un
+// message d'erreur utile (souvent un autre DNS local ou le partage de connexion).
 func portOwner() string {
 	out, err := sysx.PowerShell(10*time.Second,
 		`$p = @(Get-NetUDPEndpoint -LocalPort 53 -ErrorAction SilentlyContinue) + @(Get-NetTCPConnection -LocalPort 53 -State Listen -ErrorAction SilentlyContinue) | `+

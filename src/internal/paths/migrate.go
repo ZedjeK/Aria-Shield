@@ -22,6 +22,7 @@ func Migrate(legacy, userDir, sysDir string) (moved []string, err error) {
 		return nil, nil
 	}
 	items := []struct{ name, dst string }{
+		// Profil unique de l'époque : le paquet vpn le convertit ensuite en carnet.
 		{"vpn-profile.bin", filepath.Join(userDir, "vpn-profile.bin")},
 		{"TorBrowser", filepath.Join(userDir, "TorBrowser")},
 		{"dns-backup.json", filepath.Join(sysDir, "dns-backup.json")},
@@ -61,6 +62,8 @@ func move(src, dst string) error {
 	return os.RemoveAll(src)
 }
 
+// copyTree copie récursivement un dossier. Seuls les dossiers et fichiers
+// ordinaires sont recopiés : liens et fichiers spéciaux sont ignorés.
 func copyTree(src, dst string) error {
 	return filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
 		if err != nil {

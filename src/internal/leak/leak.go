@@ -1,4 +1,8 @@
 // Package leak mesure l'adresse IP publique vue par internet, en IPv4 et en IPv6.
+//
+// Le test de fuite d'Aria compare deux mesures : l'IP de la box, prise juste
+// avant d'activer la protection, et l'IP vue une fois le tunnel ouvert. Si
+// c'est encore l'IP de la box, quelque chose sort hors du tunnel.
 package leak
 
 import (
@@ -24,6 +28,9 @@ type IPs struct {
 	V6 string `json:"v6"`
 }
 
+// fetch demande son IP à un service d'écho, en forçant la famille réseau
+// (« tcp4 » ou « tcp6 ») : sans cela, Go choisirait seul et l'on ne saurait
+// pas quelle adresse a été mesurée. Renvoie "" en cas d'échec.
 func fetch(ctx context.Context, url, network string) string {
 	dialer := &net.Dialer{Timeout: timeout}
 	client := &http.Client{
@@ -48,6 +55,7 @@ func fetch(ctx context.Context, url, network string) string {
 	if resp.StatusCode != http.StatusOK {
 		return ""
 	}
+	// Une IP tient en moins de 64 octets : rien de plus n'est lu.
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 64))
 	if err != nil {
 		return ""
