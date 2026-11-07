@@ -13,11 +13,11 @@ const (
 
 func validInput() Input {
 	return Input{
-		Name:       "Proton NL-FREE",
+		Name:       "Proton Pays-Bas",
 		PrivateKey: testPriv,
-		Addresses:  "10.2.0.2/32, 2a07:b944::2:2/128",
+		Addresses:  "10.2.0.2/32, fd00:2::2/128",
 		PublicKey:  testPub,
-		Endpoint:   "89.39.107.156:51820",
+		Endpoint:   "203.0.113.10:51820",
 		Keepalive:  "25",
 	}
 }
@@ -27,7 +27,7 @@ func TestValidateOK(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(p.Addresses) != 2 || !p.HasIPv6() || p.Keepalive != 25 || p.Endpoint != "89.39.107.156:51820" {
+	if len(p.Addresses) != 2 || !p.HasIPv6() || p.Keepalive != 25 || p.Endpoint != "203.0.113.10:51820" {
 		t.Fatalf("profil inattendu : %+v", p)
 	}
 	v := p.View()
@@ -50,7 +50,7 @@ func TestValidateErrors(t *testing.T) {
 		PrivateKey: "pas-une-cle",
 		Addresses:  "10.2.0.300/32",
 		PublicKey:  testPriv,
-		Endpoint:   "89.39.107.156",
+		Endpoint:   "203.0.113.10",
 		Keepalive:  "-3",
 	}
 	_, err := in.Validate(Profile{})

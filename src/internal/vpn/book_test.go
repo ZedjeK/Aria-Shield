@@ -69,7 +69,7 @@ func TestBookPutActiveDelete(t *testing.T) {
 
 func TestBookMigrationDepuisV08(t *testing.T) {
 	s := testStore(t)
-	old := mustProfile(t, "Proton NL-FREE")
+	old := mustProfile(t, "Proton Pays-Bas")
 	data, _ := json.Marshal(old)
 	if err := os.WriteFile(filepath.Join(s.dir, legacyFile), data, 0o600); err != nil {
 		t.Fatal(err)

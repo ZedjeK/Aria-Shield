@@ -6,27 +6,27 @@ import (
 )
 
 const sampleConf = "\ufeff[Interface]\r\n" +
-	"# Key for NL-FREE#12\r\n" +
+	"# Key for NL#12\r\n" +
 	"PrivateKey = " + testPriv + "\r\n" +
 	"Address = 10.2.0.2/32\r\n" +
-	"Address = 2a07:b944::2:2/128\r\n" +
+	"Address = fd00:2::2/128\r\n" +
 	"DNS = 10.2.0.1\r\n" +
 	"PostUp = calc.exe\r\n" +
 	"\r\n" +
 	"[Peer]\r\n" +
-	"# NL-FREE#12\r\n" +
+	"# NL#12\r\n" +
 	"PublicKey = " + testPub + "\r\n" +
 	"AllowedIPs = 0.0.0.0/0, ::/0\r\n" +
 	"Endpoint = 203.0.113.10:51820\r\n"
 
 func TestParseConf(t *testing.T) {
-	imp, err := ParseConf(sampleConf, NameFromFile(`C:\Users\x\Downloads\wg_NL-FREE-12.conf`))
+	imp, err := ParseConf(sampleConf, NameFromFile(`C:\Users\x\Downloads\wg_NL-12.conf`))
 	if err != nil {
 		t.Fatal(err)
 	}
 	in := imp.Input
-	if in.Name != "wg NL-FREE-12" || in.PrivateKey != testPriv || in.PublicKey != testPub ||
-		in.Endpoint != "203.0.113.10:51820" || in.Addresses != "10.2.0.2/32, 2a07:b944::2:2/128" {
+	if in.Name != "wg NL-12" || in.PrivateKey != testPriv || in.PublicKey != testPub ||
+		in.Endpoint != "203.0.113.10:51820" || in.Addresses != "10.2.0.2/32, fd00:2::2/128" {
 		t.Fatalf("lecture inattendue : %+v", in)
 	}
 	notes := strings.Join(imp.Notes, " | ")
