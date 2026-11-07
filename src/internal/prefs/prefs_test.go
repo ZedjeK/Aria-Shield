@@ -10,7 +10,7 @@ import (
 func TestDefaults(t *testing.T) {
 	s := New(t.TempDir())
 	p := s.Load()
-	if !p.Resume || p.Last != None || !p.Notify || p.TrayHintShown {
+	if !p.Resume || p.Last != None || !p.Notify {
 		t.Fatalf("défauts inattendus : %+v", p)
 	}
 }

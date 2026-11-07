@@ -101,7 +101,7 @@ func main() {
 		}
 		window.Hide()
 		e.Cancel()
-		go svc.notify.trayHint() // une seule fois : « Aria continue ici »
+		go svc.notify.trayHint() // « Aria continue en arrière-plan »
 	})
 
 	// Icône de la zone de notification (celle de l'exe) : clic gauche pour

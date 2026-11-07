@@ -2,9 +2,9 @@ package main
 
 // Notifications Windows d'Aria, pour ce que tu dois savoir même fenêtre
 // cachée : un incident (Unbound arrêté, protection coupée, réactivation
-// impossible au lancement), la sortie d'Aria, et une seule fois l'astuce
-// « Aria continue dans la zone de notification ». Une réactivation réussie au
-// démarrage reste silencieuse.
+// impossible au lancement), la sortie d'Aria, et à chaque fermeture de la
+// fenêtre le rappel « Aria continue dans la zone de notification ». Une
+// réactivation réussie au démarrage reste silencieuse.
 //
 // Le service de Wails inscrit l'appli dans le registre de l'utilisateur. Rien
 // n'y est écrit tant que les notifications sont désactivées, et les désactiver
@@ -113,12 +113,9 @@ func (n *notifier) setEnabled(on bool) (string, error) {
 	return "", nil
 }
 
-// trayHint montre, une seule fois, qu'Aria continue dans la zone de notification.
+// trayHint rappelle, à chaque fermeture de la fenêtre, qu'Aria continue dans
+// la zone de notification.
 func (n *notifier) trayHint() {
-	if n.prefs.Load().TrayHintShown {
-		return
-	}
-	n.prefs.Update(func(p *prefs.Prefs) { p.TrayHintShown = true })
 	n.send("Aria Shield continue en arrière-plan",
 		"Ta protection reste active. Pour rouvrir Aria ou la quitter, utilise son icône dans la zone de notification.")
 }

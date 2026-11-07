@@ -39,9 +39,6 @@ type Prefs struct {
 	Last string `json:"derniere"`
 	// Notify : notifications Windows (incidents, sortie d'Aria).
 	Notify bool `json:"notifications"`
-	// TrayHintShown : l'astuce « Aria continue dans la zone de notification »
-	// a déjà été montrée (une seule fois).
-	TrayHintShown bool `json:"astuce-zone-notification"`
 }
 
 // defaults : reprise et notifications activées, rien à reprendre au premier lancement.

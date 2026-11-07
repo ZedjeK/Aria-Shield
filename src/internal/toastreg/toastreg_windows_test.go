@@ -41,6 +41,30 @@ func TestRemove(t *testing.T) {
 	}
 }
 
+func TestPointsTo(t *testing.T) {
+	path := `Software\Aria Shield Test toastreg pointsTo`
+	defer registry.DeleteKey(registry.CURRENT_USER, path)
+	for _, c := range []struct {
+		value string
+		want  bool
+	}{
+		{`C:\Users\x\Desktop\Aria-Shield.exe`, true},
+		{`"C:\Program Files\Aria Shield\Aria-Shield.exe" %1`, true},
+		{`C:\Program Files\Autre\autre.exe`, false},
+		{`"C:\Aria-Shield.exe.autre\x.exe" %1`, false},
+	} {
+		k, _, err := registry.CreateKey(registry.CURRENT_USER, path, registry.ALL_ACCESS)
+		if err != nil {
+			t.Fatal(err)
+		}
+		k.SetStringValue("", c.value)
+		k.Close()
+		if got := pointsTo(path, exeName); got != c.want {
+			t.Errorf("pointsTo(%q) = %v, attendu %v", c.value, got, c.want)
+		}
+	}
+}
+
 func TestRemoveIgnoresBadGUID(t *testing.T) {
 	app := "Aria Shield Test toastreg mauvais GUID"
 	k, _, err := registry.CreateKey(registry.CURRENT_USER, aumidPath+app, registry.ALL_ACCESS)

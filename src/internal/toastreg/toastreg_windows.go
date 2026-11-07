@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 
 	"golang.org/x/sys/windows/registry"
 )
@@ -42,8 +43,43 @@ func Remove(appName string) error {
 		del(clsidPath + guid)
 		os.Remove(filepath.Join(os.TempDir(), appName+guid+".png"))
 	}
+	// go-toast inscrit aussi son exe sous un GUID fixe, le même pour toutes les
+	// applis qui l'utilisent (il ne tient pas compte du GUID propre à l'appli) :
+	// on ne l'efface que s'il désigne bien notre exe.
+	if pointsTo(clsidPath+goToastGUID+`\LocalServer32`, exeName) {
+		del(clsidPath + goToastGUID + `\LocalServer32`)
+		del(clsidPath + goToastGUID)
+	}
 	del(aumidPath + appName)
 	del(appRootPath + appName + `\NotificationCategories`)
 	del(appRootPath + appName)
 	return errors.Join(errs...)
+}
+
+// goToastGUID : GUID par défaut de go-toast v2 (wintoast/impl.go).
+const goToastGUID = "{0F82E845-CB89-4039-BDBF-67CA33254C76}"
+
+// exeName : nom de l'exe d'Aria, quel que soit son dossier.
+const exeName = "Aria-Shield.exe"
+
+// pointsTo indique si la valeur par défaut de la clé désigne un exe nommé exe.
+func pointsTo(path, exe string) bool {
+	k, err := registry.OpenKey(registry.CURRENT_USER, path, registry.QUERY_VALUE)
+	if err != nil {
+		return false
+	}
+	defer k.Close()
+	v, _, err := k.GetStringValue("")
+	if err != nil {
+		return false
+	}
+	v = strings.TrimSpace(v)
+	if strings.HasPrefix(v, `"`) {
+		if end := strings.Index(v[1:], `"`); end >= 0 {
+			v = v[1 : 1+end]
+		}
+	} else if i := strings.Index(strings.ToLower(v), ".exe"); i >= 0 {
+		v = v[:i+4]
+	}
+	return strings.EqualFold(filepath.Base(v), exe)
 }
