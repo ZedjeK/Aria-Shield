@@ -53,7 +53,7 @@ type ShieldService struct {
 	tun   *vpn.Tunnel         // tunnel WireGuard et kill switch
 	tor   *torbrowser.Manager // Tor Browser portable
 
-	userDir  string // %LOCALAPPDATA%\AriaShield
+	userDir  string // %USERPROFILE%\.Aria-Shield
 	sysDir   string // %PROGRAMDATA%\AriaShield (réservé aux administrateurs)
 	noticeMu sync.Mutex
 	notice   string // message affiché une fois (migration, erreur de dossier)
@@ -72,9 +72,15 @@ func NewShieldService() *ShieldService {
 	s := &ShieldService{tun: vpn.NewTunnel()}
 
 	var errs []string
-	userDir, err := paths.UserDir()
+	userDir, movedHome, err := paths.UserDir()
 	if err != nil {
-		errs = append(errs, "dossier utilisateur : "+err.Error())
+		errs = append(errs, "déplacement de tes données vers .Aria-Shield, réessayé au prochain lancement"+
+			" (ferme Tor Browser avant) : "+err.Error())
+	}
+	if movedHome {
+		s.notice = "Tes données (profils VPN, Tor Browser) sont maintenant dans " + userDir +
+			", comme pour les autres applis Aria. L'ancien cache de l'interface, %APPDATA%\\Aria-Shield.exe," +
+			" peut être supprimé."
 	}
 	sysDir, aside, err := paths.SystemDir()
 	sysLocked := err == nil

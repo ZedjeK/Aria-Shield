@@ -64,7 +64,7 @@ Aria ne dépose rien à côté de l'exe. Tout va dans deux dossiers :
 
 | Dossier | Contenu | Accès |
 | --- | --- | --- |
-| `%LOCALAPPDATA%\AriaShield` | Tes données : profils VPN chiffrés, Tor Browser et ses favoris | Ton compte |
+| `%USERPROFILE%\.Aria-Shield` | Tes données : profils VPN chiffrés, Tor Browser et ses favoris, cache de l'interface (`webview`) | Ton compte |
 | `%PROGRAMDATA%\AriaShield` | Ce qu'Aria exécute en administrateur (Unbound) et la photo de ton DNS d'origine | Administrateurs et système uniquement |
 
 Le second est créé déjà verrouillé, pour qu'aucun programme sans droits admin ne puisse y glisser un faux exécutable ou une DLL qu'Aria lancerait ensuite. S'il existe déjà sans avoir été créé par Aria (propriétaire inattendu, ou lien vers un autre dossier), il est mis de côté sous le nom `AriaShield.suspect-<date>` et remplacé par un dossier neuf ; Aria te prévient au lancement. Si le verrouillage échoue, Aria refuse de lancer Unbound.
@@ -73,7 +73,9 @@ Le second est créé déjà verrouillé, pour qu'aucun programme sans droits adm
 
 Depuis la v0.7, l'ancien dossier `AriaShield-data` des versions précédentes est déplacé automatiquement vers ces emplacements au premier lancement, puis supprimé. Ferme l'ancienne version d'Aria avant de lancer la nouvelle.
 
-Si tu lances Aria depuis un compte standard en saisissant le mot de passe d'un autre compte administrateur, ses données iront dans le dossier `%LOCALAPPDATA%` de ce compte administrateur.
+Depuis la v0.9, tes données sont dans `.Aria-Shield`, comme pour les autres applis Aria : l'ancien dossier `%LOCALAPPDATA%\AriaShield` y est déplacé au premier lancement (ferme Tor Browser avant). L'ancien cache de l'interface, `%APPDATA%\Aria-Shield.exe`, ne sert plus et peut être supprimé.
+
+Si tu lances Aria depuis un compte standard en saisissant le mot de passe d'un autre compte administrateur, ses données iront dans le profil de ce compte administrateur, et Tor Browser (installé et lancé avec les droits du compte ouvert) ne fonctionnera pas : lance Aria depuis ton propre compte.
 
 ## Premiers pas
 

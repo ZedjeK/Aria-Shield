@@ -15,6 +15,7 @@ import (
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
+	"aria-shield/internal/paths"
 	"aria-shield/internal/torbrowser"
 )
 
@@ -33,11 +34,16 @@ func main() {
 		os.Exit(torbrowser.RunHelper(os.Args[2:]))
 	}
 
+	svc := NewShieldService()
 	app := application.New(application.Options{
 		Name:        "Aria Shield",
 		Description: "Navigation discrète : DNS local Unbound, VPN et Tor",
 		Services: []application.Service{
-			application.NewService(NewShieldService()),
+			application.NewService(svc),
+		},
+		Windows: application.WindowsOptions{
+			// Profil WebView2 rangé avec les données d'Aria, et non dans %APPDATA%.
+			WebviewUserDataPath: paths.WebviewDir(svc.userDir),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
