@@ -1,5 +1,25 @@
 package main
 
+// ShieldService est le pont entre l'interface et les moteurs d'Aria.
+//
+// Chaque méthode exportée est appelable depuis le JavaScript : Wails génère
+// pour elle une fonction du même nom (frontend/bindings, à la compilation).
+// Les méthodes renvoient toujours un résultat affichable (journal d'étapes et
+// message d'erreur en français) plutôt qu'une erreur Go brute.
+//
+// Organisation du fichier :
+//
+//	démarrage        NewShieldService, ServiceStartup, ServiceShutdown, Status
+//	Résolveur        StartDNS, StopDNS, TestDNS, Enable/DisableSystemDNS
+//	Profils VPN      VPNProfile, SaveVPNProfile, ImportVPNConf, DeleteVPNProfile,
+//	                 UseVPNProfile (bascule à chaud), TestVPN
+//	Protection       Protect, Unprotect, RestoreAll
+//	Tests            TestSystem
+//	Mode Fantôme     TorState, TorPrepare, TorCheckUpdate, TorUpdate, TorLaunch
+//
+// Verrous : s.mu sérialise tout ce qui ouvre, bascule ou ferme le tunnel, pour
+// qu'un double clic ne lance jamais deux séquences en même temps.
+
 import (
 	"context"
 	"errors"
@@ -27,11 +47,11 @@ type Step = sysdns.Step
 
 // ShieldService expose au frontend les actions d'Aria Shield.
 type ShieldService struct {
-	dns   *dnsengine.Engine
-	sys   *sysdns.Manager
-	store *vpn.Store
-	tun   *vpn.Tunnel
-	tor   *torbrowser.Manager
+	dns   *dnsengine.Engine   // résolveur Unbound
+	sys   *sysdns.Manager     // DNS des cartes réseau de Windows
+	store *vpn.Store          // carnet de profils VPN chiffré
+	tun   *vpn.Tunnel         // tunnel WireGuard et kill switch
+	tor   *torbrowser.Manager // Tor Browser portable
 
 	userDir  string // %LOCALAPPDATA%\AriaShield
 	sysDir   string // %PROGRAMDATA%\AriaShield (réservé aux administrateurs)
@@ -192,6 +212,7 @@ func (s *ShieldService) ServiceShutdown() error {
 }
 
 // Status renvoie l'état des droits, des moteurs et de la protection.
+// L'interface l'appelle toutes les 5 s : il doit rester rapide (aucun accès réseau).
 func (s *ShieldService) Status() Status {
 	running := s.dns.Running()
 	tun := s.tun.Stats()
@@ -290,6 +311,10 @@ func (s *ShieldService) EnableSystemDNS() SystemResult {
 	return res
 }
 
+// enableSystemDNS bascule Windows sur le résolveur, en trois temps : le
+// résolveur doit d'abord passer ses tests, puis les cartes sont basculées, et
+// enfin Windows doit résoudre le marqueur qu'Unbound est seul à connaître.
+// Si cette dernière preuve manque, tout est remis comme avant.
 func (s *ShieldService) enableSystemDNS() ([]Step, string) {
 	if !s.dns.Running() {
 		return nil, "démarre d'abord le résolveur"
@@ -400,6 +425,8 @@ func (s *ShieldService) importFiles(files []string) ImportResult {
 	return res
 }
 
+// importOne lit, valide et enregistre un fichier .conf. La taille est vérifiée
+// avant lecture : un fichier énorme ou spécial (périphérique, tube) est refusé.
 func (s *ShieldService) importOne(path string) (vpn.Profile, []string, error) {
 	fi, err := os.Stat(path)
 	if err != nil {
@@ -585,6 +612,8 @@ func masked(v leak.Verdict) *leak.Verdict {
 }
 
 // Protect active le mode Discret : résolveur, DNS de Windows, tunnel et kill switch.
+// Chaque étape est vérifiée ; au premier échec, fail défait ce qui a été mis en
+// place (rollbackLocked) pour ne jamais laisser une protection à moitié posée.
 func (s *ShieldService) Protect() SystemResult {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -746,6 +775,7 @@ func (s *ShieldService) TestSystem() SystemTests {
 	return t
 }
 
+// plural décrit combien de cartes réseau pointent sur le résolveur.
 func plural(on, total int) string {
 	if total == 0 {
 		return "aucune carte active"
