@@ -40,7 +40,7 @@
 <div class="shell">
   <nav class="sidebar" aria-label="Sections">
     <div class="brand">
-      <Logo size={38} />
+      <Logo size={48} />
       <span class="brand-name label"><span class="brand-top">ARIA</span><span class="brand-sub">SHIELD</span></span>
     </div>
 
