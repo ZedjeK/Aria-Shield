@@ -5,10 +5,11 @@ import (
 	"testing"
 )
 
-// Clés de test générées pour l'occasion, sans rapport avec un vrai compte.
+// Clés de test générées pour les tests, sans rapport avec un vrai compte.
+// Ne jamais coller ici une clé tirée d'une vraie configuration VPN.
 const (
-	testPriv = "YHfSyDAbVM4xsZHBH4dLR3Brd5n9uiHkMv6BVf0xkGw="
-	testPub  = "Wd3XQ0cpdYv1JNVbQMjX/T5U0sB7Z8zKzKc9t9ZPHXc="
+	testPriv = "YG56Juzo0So9O+LXOoxXyUNRQcHgnx+5yg+aumh2qHY="
+	testPub  = "yxKKTytNXjCe+cfddWsXUl+kO3C0AZjQ9pecJJN8tHU="
 )
 
 func validInput() Input {
