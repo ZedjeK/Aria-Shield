@@ -35,13 +35,14 @@ type Settings struct {
 	Autostart autostart.State `json:"autostart"`
 	Resume    bool            `json:"resume"`
 	Last      string          `json:"last"` // aucune, dns ou discret
+	Notify    bool            `json:"notify"`
 }
 
 // Settings lit les réglages (interroge le Planificateur de tâches : à
 // n'appeler qu'à l'ouverture de la carte, pas toutes les 5 s).
 func (s *ShieldService) Settings() Settings {
 	p := s.prefs.Load()
-	return Settings{Autostart: autostart.Status(), Resume: p.Resume, Last: p.Last}
+	return Settings{Autostart: autostart.Status(), Resume: p.Resume, Last: p.Last, Notify: p.Notify}
 }
 
 // SetAutostart crée ou supprime la tâche qui lance Aria à l'ouverture de session.
@@ -83,10 +84,37 @@ func (s *ShieldService) SetResume(on bool) SystemResult {
 	return SystemResult{}
 }
 
+// SetNotifications active ou non les notifications Windows.
+func (s *ShieldService) SetNotifications(on bool) SystemResult {
+	label := "Notifications Windows activées"
+	if !on {
+		label = "Notifications Windows désactivées"
+	}
+	note, err := s.notify.setEnabled(on)
+	if err != nil {
+		return SystemResult{Steps: []Step{{Label: label, OK: false, Note: err.Error()}}, Error: err.Error()}
+	}
+	return SystemResult{Steps: []Step{{Label: label, OK: true, Note: note}}}
+}
+
 // Quit ferme vraiment Aria : ServiceShutdown remet ta connexion comme avant.
 // Lancé à part pour que l'appel de l'interface puisse d'abord répondre.
 func (s *ShieldService) Quit() {
-	go application.Get().Quit()
+	go s.quit()
+}
+
+// quit prévient puis quitte (menu de l'icône ou bouton de l'interface).
+func (s *ShieldService) quit() {
+	s.quitting.Store(true)
+	s.alert("Aria Shield est fermée", "Ta connexion d'origine est rétablie. Relance Aria pour retrouver ta protection.")
+	application.Get().Quit()
+}
+
+// alert envoie une notification Windows (si elles sont activées).
+func (s *ShieldService) alert(title, body string) {
+	if s.notify != nil {
+		s.notify.send(title, body)
+	}
 }
 
 // remember retient la dernière protection choisie par l'utilisateur.
@@ -134,6 +162,7 @@ func (s *ShieldService) resume() {
 		}
 		if time.Now().After(deadline) {
 			s.addNotice("Impossible de réactiver " + what + " au lancement : " + msg)
+			s.alert("Protection non réactivée", "Aria n'a pas pu réactiver "+what+" : "+msg)
 			return
 		}
 		select {

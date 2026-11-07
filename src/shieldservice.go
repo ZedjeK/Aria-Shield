@@ -28,6 +28,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -72,6 +73,8 @@ type ShieldService struct {
 	resumeStop chan struct{} // fermé quand l'utilisateur reprend la main
 	resuming   string        // réactivation en cours, affichée dans l'interface
 	restarts   []time.Time   // relances automatiques d'Unbound (sous resumeMu)
+	notify     *notifier     // notifications Windows (notify.go), posé par main
+	quitting   atomic.Bool   // Aria est en train de quitter
 }
 
 // NewShieldService prépare le service et ses moteurs (rien n'est lancé).
@@ -141,10 +144,12 @@ func NewShieldService() *ShieldService {
 			// Relance impossible : on coupe tout proprement.
 			s.tun.Down()
 			s.sys.Disable("Unbound s'est arrêté : protection coupée et connexion d'origine remise.")
+			s.alert("Protection coupée", "Le résolveur Unbound s'est arrêté et n'a pas pu être relancé : tunnel fermé, connexion d'origine remise.")
 			return
 		}
 		if s.sys.Enabled() {
 			s.sys.Disable("Unbound s'est arrêté : ton DNS d'origine a été remis automatiquement.")
+			s.alert("DNS d'origine remis", "Le résolveur Unbound s'est arrêté et n'a pas pu être relancé : Windows utilise de nouveau le DNS de ta box.")
 		}
 	})
 	return s
@@ -229,6 +234,7 @@ func (s *ShieldService) ServiceStartup(ctx context.Context, options application.
 // Windows), tout revient comme avant. Fermer la fenêtre ne quitte pas : Aria
 // reste dans la zone de notification (main.go).
 func (s *ShieldService) ServiceShutdown() error {
+	s.quitting.Store(true)
 	s.cancelResume()
 	s.tun.Down()
 	if s.sys.Enabled() {

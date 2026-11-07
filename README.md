@@ -73,7 +73,9 @@ Le second est créé déjà verrouillé, pour qu'aucun programme sans droits adm
 
 Si tu actives « Démarrer avec Windows », Aria ajoute une tâche planifiée `\Aria Shield\Démarrage` et une copie de l'exe dans `%ProgramFiles%\Aria Shield` : la tâche lance Aria en administrateur sans rien demander, elle doit donc lancer un exe que seul un administrateur peut modifier, et pas celui de ton Bureau. Lancer une autre version d'Aria remet cette copie à jour.
 
-**Pour tout désinstaller** : dans « réglages », désactive « Démarrer avec Windows » (tâche et copie retirées), clique sur « restaurer --tout », quitte Aria, puis supprime l'exe et ces deux dossiers (le second demande une confirmation administrateur).
+Les **notifications Windows** (incident, réactivation impossible au lancement, sortie d'Aria) obligent Aria à s'inscrire dans ton registre utilisateur : `HKCU\Software\Classes\AppUserModelId\Aria Shield`, `HKCU\Software\Classes\CLSID\{GUID}` et `HKCU\Software\Aria Shield`. Rien n'y est écrit tant qu'elles sont désactivées, et les désactiver efface ces clés.
+
+**Pour tout désinstaller** : dans « réglages », désactive « Démarrer avec Windows » (tâche et copie retirées) et « Notifications Windows » (clés du registre effacées), clique sur « restaurer --tout », quitte Aria, puis supprime l'exe et ces deux dossiers (le second demande une confirmation administrateur).
 
 Depuis la v0.7, l'ancien dossier `AriaShield-data` des versions précédentes est déplacé automatiquement vers ces emplacements au premier lancement, puis supprimé. Ferme l'ancienne version d'Aria avant de lancer la nouvelle.
 
@@ -152,12 +154,14 @@ src/
 ├── main.go                     # appli Wails, fenêtre, zone de notification
 ├── shieldservice.go            # méthodes appelées par l'interface
 ├── startup.go                  # démarrage avec Windows, reprise de la protection, quitter
+├── notify.go                   # notifications Windows (incidents, sortie)
 ├── internal/
 │   ├── dnsengine/              # Unbound embarqué : extraction, lancement, tests
 │   ├── sysdns/                 # bascule et restauration du DNS de Windows
 │   ├── paths/                  # emplacements des données, verrouillage, migration
 │   ├── prefs/                  # réglages et dernière protection (reglages.json)
 │   ├── autostart/              # tâche planifiée et copie protégée dans Program Files
+│   ├── toastreg/               # nettoyage du registre des notifications
 │   ├── vpn/                    # profils chiffrés, import .conf, tunnel WireGuardNT
 │   ├── wgnt/                   # pilote WireGuardNT chargé en mémoire (dérivé de wireguard-windows, MIT)
 │   ├── killswitch/             # pare-feu WFP (dérivé de wireguard-windows, MIT)

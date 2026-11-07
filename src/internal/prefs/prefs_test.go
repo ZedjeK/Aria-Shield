@@ -10,8 +10,17 @@ import (
 func TestDefaults(t *testing.T) {
 	s := New(t.TempDir())
 	p := s.Load()
-	if !p.Resume || p.Last != None {
+	if !p.Resume || p.Last != None || !p.Notify || p.TrayHintShown {
 		t.Fatalf("défauts inattendus : %+v", p)
+	}
+}
+
+// Un reglages.json d'avant les notifications les garde activées.
+func TestMissingFieldKeepsDefault(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, fileName), []byte(`{"reprise":true,"derniere":"dns"}`), 0o644)
+	if p := New(dir).Load(); !p.Notify || p.Last != DNS {
+		t.Fatalf("relu : %+v", p)
 	}
 }
 

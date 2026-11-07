@@ -37,10 +37,15 @@ type Prefs struct {
 	Resume bool `json:"reprise"`
 	// Last : la dernière protection choisie (None, DNS ou Discret).
 	Last string `json:"derniere"`
+	// Notify : notifications Windows (incidents, sortie d'Aria).
+	Notify bool `json:"notifications"`
+	// TrayHintShown : l'astuce « Aria continue dans la zone de notification »
+	// a déjà été montrée (une seule fois).
+	TrayHintShown bool `json:"astuce-zone-notification"`
 }
 
-// defaults : la reprise est activée, rien à reprendre au premier lancement.
-func defaults() Prefs { return Prefs{Resume: true, Last: None} }
+// defaults : reprise et notifications activées, rien à reprendre au premier lancement.
+func defaults() Prefs { return Prefs{Resume: true, Last: None, Notify: true} }
 
 // Store lit et écrit reglages.json.
 type Store struct {

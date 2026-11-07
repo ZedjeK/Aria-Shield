@@ -4,7 +4,7 @@
   // fenêtre range Aria dans la zone de notification ; seul « Quitter » l'arrête.
   import { onMount } from 'svelte'
   import Switch from '../lib/Switch.svelte'
-  import { app, settings, loadSettings, setAutostart, setResume, quitApp } from '../lib/state.svelte.js'
+  import { app, settings, loadSettings, setAutostart, setResume, setNotifications, quitApp } from '../lib/state.svelte.js'
 
   onMount(loadSettings)
 
@@ -47,6 +47,18 @@
           disabled={!d || app.busy}
           label="Réactiver la dernière protection au lancement"
           onchange={setResume}
+        />
+      </div>
+      <div class="row">
+        <span class="row-text">
+          <span class="row-name">Notifications Windows</span>
+          <span class="row-detail">En cas d'incident ou d'échec de la réactivation, et quand tu quittes Aria. Une réactivation réussie reste silencieuse.</span>
+        </span>
+        <Switch
+          checked={d?.notify ?? false}
+          disabled={!d || app.busy}
+          label="Notifications Windows"
+          onchange={setNotifications}
         />
       </div>
       {#if settings.error}

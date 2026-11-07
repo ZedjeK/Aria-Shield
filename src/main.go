@@ -45,6 +45,7 @@ func main() {
 	silent := slices.Contains(os.Args[1:], autostart.SilentArg)
 
 	svc := NewShieldService()
+	svc.notify = newNotifier(svc.prefs)
 	var window *application.WebviewWindow
 	showWindow := func() {
 		if window != nil {
@@ -57,6 +58,7 @@ func main() {
 		Name:        "Aria Shield",
 		Description: "Navigation discrète : DNS local Unbound, VPN et Tor",
 		Services: []application.Service{
+			application.NewService(svc.notify),
 			application.NewService(svc),
 		},
 		// Une seule Aria à la fois : deux instances se disputeraient le DNS de
@@ -94,8 +96,12 @@ func main() {
 	})
 	// La croix range la fenêtre au lieu de quitter.
 	window.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) {
+		if svc.quitting.Load() {
+			return // Aria quitte vraiment : on laisse la fenêtre se fermer
+		}
 		window.Hide()
 		e.Cancel()
+		go svc.notify.trayHint() // une seule fois : « Aria continue ici »
 	})
 
 	// Icône de la zone de notification (celle de l'exe) : clic gauche pour
@@ -103,7 +109,7 @@ func main() {
 	menu := application.NewMenu()
 	menu.Add("Ouvrir Aria Shield").OnClick(func(*application.Context) { showWindow() })
 	menu.AddSeparator()
-	menu.Add("Quitter (rétablit ta connexion d'origine)").OnClick(func(*application.Context) { app.Quit() })
+	menu.Add("Quitter (rétablit ta connexion d'origine)").OnClick(func(*application.Context) { go svc.quit() })
 	tray := app.SystemTray.New()
 	tray.SetTooltip("Aria Shield")
 	tray.SetMenu(menu)

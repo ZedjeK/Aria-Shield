@@ -365,6 +365,12 @@ export async function setResume(on) {
   await loadSettings()
 }
 
+/** Active ou non les notifications Windows (incidents, sortie d'Aria). */
+export async function setNotifications(on) {
+  await run('Notifications Windows', () => ShieldService.SetNotifications(on))
+  await loadSettings()
+}
+
 /** Quitte vraiment Aria : la connexion d'origine est remise par le Go. */
 export async function quitApp() {
   app.busy = true
