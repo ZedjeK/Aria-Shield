@@ -81,7 +81,7 @@ func WebviewDir(userDir string) string { return filepath.Join(userDir, "webview"
 // (écriture réservée aux administrateurs et au système). aside est le nom d'un
 // dossier suspect, qu'Aria n'avait pas créé, mis de côté à la place ("" sinon).
 func SystemDir() (dir, aside string, err error) {
-	dir = filepath.Join(envOr("ProgramData", filepath.Join(os.TempDir(), "ProgramData")), appDir)
+	dir = filepath.Join(programData(), appDir)
 	aside, err = prepareSystemDir(dir)
 	return dir, aside, err
 }

@@ -17,6 +17,17 @@ import (
 // sous-dossiers et fichiers ; FA = contrôle total. Propriétaire : Administrateurs.
 const lockedSDDL = "O:BAD:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)"
 
+// programData renvoie le dossier ProgramData demandé à Windows. La variable
+// d'environnement %ProgramData% ne convient pas : un programme sans droits peut
+// la redéfinir pour ton compte (HKCU\Environment), et Aria, lancée en admin,
+// irait alors poser Unbound dans un dossier qu'il contrôle.
+func programData() string {
+	if dir, err := windows.KnownFolderPath(windows.FOLDERID_ProgramData, 0); err == nil && dir != "" {
+		return dir
+	}
+	return `C:\ProgramData`
+}
+
 // prepareSystemDir crée le dossier système déjà verrouillé, ou vérifie qu'un
 // dossier existant a bien été créé par Aria avant de le reverrouiller.
 //

@@ -24,7 +24,7 @@
 
 ## Pourquoi
 
-Ton FAI voit chaque site que tu visites (par le DNS), peut en bloquer certains, et les sites voient ton adresse IP. Les outils pour y remédier existent, mais il faut les installer, les configurer, et ne pas oublier de tout remettre en place. Aria Shield les réunit dans un seul exe portable, les active en un clic, vérifie qu'ils fonctionnent vraiment, et laisse Windows exactement comme avant quand tu la fermes.
+Ton FAI voit chaque site que tu visites (par le DNS), peut en bloquer certains, et les sites voient ton adresse IP. Les outils pour y remédier existent, mais il faut les installer, les configurer, et ne pas oublier de tout remettre en place. Aria Shield les réunit dans un seul exe portable, les active en un clic, vérifie qu'ils fonctionnent vraiment, et laisse Windows exactement comme avant quand tu la quittes.
 
 ## Ce qu'il fait
 
@@ -35,6 +35,8 @@ Ton FAI voit chaque site que tu visites (par le DNS), peut en bloquer certains, 
 | **Fantôme** | La navigation dans Tor Browser : anonymat fort | Tor Browser intégré, vérifié et tenu à jour par Aria. Combiné au mode Discret, ton FAI ne voit même pas que tu utilises Tor |
 
 **Plusieurs profils VPN** (jusqu'à 20) : importe le fichier `.conf` de ton fournisseur en un clic et change de pays avec « basculer », sans couper la protection. *Nouveauté de la v0.9, déjà dans le code de `main`.*
+
+**Toujours active si tu le veux** (v0.9) : fermer la fenêtre range Aria dans la zone de notification, sans rien couper. Dans « réglages », active « Démarrer avec Windows » : Aria se lance à l'ouverture de ta session, sans fenêtre UAC, et réactive ta dernière protection (DNS seul ou mode Discret).
 
 Une page **Tests** vérifie ce qu'Aria annonce : Windows passe bien par le résolveur, aucune fuite d'IP en IPv4 ou IPv6, kill switch actif, et navigateurs dont le « DNS sécurisé » contournerait Aria.
 
@@ -69,7 +71,9 @@ Aria ne dépose rien à côté de l'exe. Tout va dans deux dossiers :
 
 Le second est créé déjà verrouillé, pour qu'aucun programme sans droits admin ne puisse y glisser un faux exécutable ou une DLL qu'Aria lancerait ensuite. S'il existe déjà sans avoir été créé par Aria (propriétaire inattendu, ou lien vers un autre dossier), il est mis de côté sous le nom `AriaShield.suspect-<date>` et remplacé par un dossier neuf ; Aria te prévient au lancement. Si le verrouillage échoue, Aria refuse de lancer Unbound.
 
-**Pour tout désinstaller** : clique sur « restaurer --tout », ferme Aria, puis supprime l'exe et ces deux dossiers (le second demande une confirmation administrateur).
+Si tu actives « Démarrer avec Windows », Aria ajoute une tâche planifiée `\Aria Shield\Démarrage` et une copie de l'exe dans `%ProgramFiles%\Aria Shield` : la tâche lance Aria en administrateur sans rien demander, elle doit donc lancer un exe que seul un administrateur peut modifier, et pas celui de ton Bureau. Lancer une autre version d'Aria remet cette copie à jour.
+
+**Pour tout désinstaller** : dans « réglages », désactive « Démarrer avec Windows » (tâche et copie retirées), clique sur « restaurer --tout », quitte Aria, puis supprime l'exe et ces deux dossiers (le second demande une confirmation administrateur).
 
 Depuis la v0.7, l'ancien dossier `AriaShield-data` des versions précédentes est déplacé automatiquement vers ces emplacements au premier lancement, puis supprimé. Ferme l'ancienne version d'Aria avant de lancer la nouvelle.
 
@@ -88,11 +92,11 @@ Juste un DNS sans blocage, sans VPN ? Sur la page Résolveur DNS, démarre le r�
 
 Pour changer de pays protection active : page VPN, « basculer » sur un autre profil (v0.9). Le kill switch reste en place pendant le changement.
 
-Pour revenir à la normale à tout moment : « restaurer --tout », en bas de la barre latérale.
+Pour revenir à la normale à tout moment : « restaurer --tout », en bas de la barre latérale. Fermer la fenêtre ne coupe rien : pour arrêter Aria, « Quitter » dans le menu de son icône (clic droit, zone de notification) ou dans « réglages ».
 
 ## Sécurité
 
-- **Rien ne reste derrière toi** : à la désactivation, à la fermeture d'Aria et même en cas de plantage, ton DNS d'origine revient, le kill switch disparaît (session de pare-feu dynamique) et le pilote VPN est retiré.
+- **Rien ne reste derrière toi** : à la désactivation, quand tu quittes Aria et même en cas de plantage, ton DNS d'origine revient, le kill switch disparaît (session de pare-feu dynamique) et le pilote VPN est retiré.
 - **Profils VPN chiffrés** avec DPAPI, liés à ton compte Windows. Les clés ne quittent jamais la partie Go d'Aria : l'interface ne les reçoit pas, même pour les afficher. À l'import d'un `.conf`, c'est Aria qui lit le fichier ; les commandes qu'il pourrait contenir (`PostUp`…) sont ignorées, jamais exécutées.
 - **Aucune fuite pendant une bascule** : changer de serveur garde la même carte réseau et le même kill switch ; si le nouveau serveur ne répond pas, Aria revient sur l'ancien.
 - **Composants vérifiés** : chaque binaire embarqué vient de la source officielle, avec sa signature vérifiée (voir plus bas). Aria revérifie leur empreinte ou leur signature avant chaque utilisation.
@@ -145,12 +149,15 @@ Les paquets `killswitch` et `wgnt` reprennent le code de WireGuard tel quel (com
 build.ps1                       # compilation locale
 docs/                           # logo et captures du README
 src/
-├── main.go                     # appli Wails, fenêtre
+├── main.go                     # appli Wails, fenêtre, zone de notification
 ├── shieldservice.go            # méthodes appelées par l'interface
+├── startup.go                  # démarrage avec Windows, reprise de la protection, quitter
 ├── internal/
 │   ├── dnsengine/              # Unbound embarqué : extraction, lancement, tests
 │   ├── sysdns/                 # bascule et restauration du DNS de Windows
 │   ├── paths/                  # emplacements des données, verrouillage, migration
+│   ├── prefs/                  # réglages et dernière protection (reglages.json)
+│   ├── autostart/              # tâche planifiée et copie protégée dans Program Files
 │   ├── vpn/                    # profils chiffrés, import .conf, tunnel WireGuardNT
 │   ├── wgnt/                   # pilote WireGuardNT chargé en mémoire (dérivé de wireguard-windows, MIT)
 │   ├── killswitch/             # pare-feu WFP (dérivé de wireguard-windows, MIT)

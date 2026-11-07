@@ -15,6 +15,10 @@
     <path d="M6 20V10a6 6 0 0 1 12 0v10l-3-2-3 2-3-2z" /><path d="M10 10h.01" /><path d="M14 10h.01" />
   {:else if name === 'tests'}
     <path d="M9 6h11" /><path d="M9 12h11" /><path d="M9 18h11" /><path d="M4 6l1 1 2-2" /><path d="M4 12l1 1 2-2" /><path d="M4 18l1 1 2-2" />
+  {:else if name === 'settings'}
+    <path d="M4 6h10" /><path d="M18 6h2" /><circle cx="16" cy="6" r="2" /><path d="M4 12h4" /><path d="M12 12h8" /><circle cx="10" cy="12" r="2" /><path d="M4 18h10" /><path d="M18 18h2" /><circle cx="16" cy="18" r="2" />
+  {:else if name === 'power'}
+    <path d="M12 3v9" /><path d="M6.3 7a8 8 0 1 0 11.4 0" />
   {:else if name === 'restore'}
     <path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v5h5" />
   {:else if name === 'check'}
