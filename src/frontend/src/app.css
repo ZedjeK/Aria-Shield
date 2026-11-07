@@ -1,14 +1,28 @@
 /* Thème « Terminal Néon Glace » : bleu nuit, néons cyan/bleu/blanc,
-   orange pour les actions principales, lavande pour le mode Fantôme. */
+   orange pour les actions principales, lavande pour le mode Fantôme.
+
+   Sommaire :
+     :root            couleurs, polices et coupe des coins (une seule source)
+     base             page, boutons, focus clavier, barres de défilement
+     .bevel…          coins biseautés, rappel de l'octogone du logo
+     briques          page, en-têtes, grilles, cartes, textes
+     boutons          action principale (orange) et secondaire
+     pastilles        états OK / échec / attention
+     listes, journal
+   Les styles propres à une page restent dans son fichier .svelte. */
 :root {
+  /* Fonds, du plus profond au survol */
   --bg: #030812;
   --sidebar: #030812;
-  --surface: #06101f;
-  --surface-sunken: #040b17;
+  --surface: #06101f; /* cartes */
+  --surface-sunken: #040b17; /* zones en creux : journal, champs */
   --hover: #0b1a30;
+  /* Traits */
   --line: #1a2d4d;
-  --line-soft: #12213a;
-  --line-strong: #27406b;
+  --line-soft: #12213a; /* séparateurs de lignes */
+  --line-strong: #27406b; /* bordures de boutons */
+  /* Textes, du plus lisible au plus discret (contraste ≥ 4,5:1 sur les cartes,
+     sauf --dim, réservé à la décoration) */
   --text: #ddebff;
   --muted: #93a8c8;
   --faint: #8197b8;
@@ -25,6 +39,7 @@
   /* Coins coupés, comme l'octogone du logo */
   --cut: 14px;
 
+  /* Polices embarquées (main.js) : titres en Space Grotesk, tout le reste en mono */
   --font-display: 'Space Grotesk', system-ui, sans-serif;
   --font-body: 'IBM Plex Mono', ui-monospace, monospace;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;

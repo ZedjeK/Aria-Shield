@@ -1,5 +1,6 @@
 <script>
-  // Icônes au trait, toutes en 24×24.
+  // Icônes au trait, toutes en 24×24, dessinées avec la couleur du texte
+  // (currentColor). Décoratives : le bouton qui les contient porte le libellé.
   let { name, size = 20 } = $props()
 </script>
 
@@ -14,8 +15,6 @@
     <path d="M6 20V10a6 6 0 0 1 12 0v10l-3-2-3 2-3-2z" /><path d="M10 10h.01" /><path d="M14 10h.01" />
   {:else if name === 'tests'}
     <path d="M9 6h11" /><path d="M9 12h11" /><path d="M9 18h11" /><path d="M4 6l1 1 2-2" /><path d="M4 12l1 1 2-2" /><path d="M4 18l1 1 2-2" />
-  {:else if name === 'shield'}
-    <path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6z" />
   {:else if name === 'restore'}
     <path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v5h5" />
   {:else if name === 'check'}

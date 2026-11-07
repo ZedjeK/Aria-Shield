@@ -1,4 +1,7 @@
 <script>
+  // Page « Mode Fantôme » : Tor Browser, embarqué dans l'exe et extrait au
+  // premier lancement. Au clic : installation si besoin, vérification des mises
+  // à jour (proposées, jamais imposées), puis lancement sans droits administrateur.
   import { onMount } from 'svelte'
   import Icon from '../lib/Icon.svelte'
   import {
@@ -7,6 +10,7 @@
 
   const st = $derived(tor.state)
   const progress = $derived(st?.progress)
+  // Pourcentage de la barre de progression (null si la taille est inconnue).
   const pct = $derived(progress?.total > 0 ? Math.round((progress.done / progress.total) * 100) : null)
   const protectedOn = $derived(app.status?.protected ?? false)
   const upd = $derived(tor.update)
@@ -32,6 +36,7 @@
   </p>
 
   <div class="grid-2">
+    <!-- Lancement, progression et proposition de mise à jour -->
     <section class="card">
       <div class="launch-head">
         <span class="ghost-icon"><Icon name="ghost" size={26} /></span>
@@ -88,6 +93,7 @@
       {/if}
     </section>
 
+    <!-- Conseils, qui tiennent compte de l'état de la protection -->
     <section class="card">
       <h2>Pour bien l'utiliser</h2>
       <div class="row">

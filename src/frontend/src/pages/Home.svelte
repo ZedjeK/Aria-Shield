@@ -1,4 +1,8 @@
 <script>
+  // Page « Accueil » façon console : le niveau de protection en grand (texte
+  // glitché, logo délavé tant que rien ne protège), la liste des moteurs en
+  // [ok] / [--], puis le choix du mode et le bouton principal, qui s'adapte à la
+  // situation (configurer le VPN, activer, désactiver, lancer Tor).
   import Logo from '../lib/Logo.svelte'
   import { app, protect, unprotect, tor, launchTor } from '../lib/state.svelte.js'
 
@@ -21,7 +25,9 @@
   )
   const tone = $derived(protectedOn && !leakOK ? 'warn' : level > 0 ? 'ok' : 'off')
 
+  // Étiquettes façon console : en marche, prêt, à configurer.
   const tags = { active: '[ok]', ready: '[--]', planned: '[  ]' }
+  // Lignes ajoutées après les moteurs du Go : kill switch et test de fuite.
   const extra = $derived([
     {
       id: 'killswitch',
@@ -47,6 +53,7 @@
 <div class="page">
   <h1 class="cmd"><span class="cwd">~/aria</span> $ statut</h1>
 
+  <!-- Niveau de protection : mot glitché, explication, logo -->
   <section class="hero" aria-label="Niveau de protection">
     <div class="hero-text">
       <span class="eyebrow">Niveau de protection</span>
@@ -71,6 +78,7 @@
   </section>
 
   <div class="bottom">
+    <!-- Moteurs : chaque ligne mène à sa page -->
     <section class="card engines" aria-label="Moteurs">
       <h2>Moteurs</h2>
       <div class="lines">
@@ -95,6 +103,7 @@
       </div>
     </section>
 
+    <!-- Mode et action principale (orange) -->
     <section class="mode-panel" aria-label="Mode">
       <span class="eyebrow">Mode</span>
       <div class="modes">
@@ -171,6 +180,7 @@
     color: #ffffff;
     overflow-wrap: anywhere;
   }
+  /* Effet glitch : deux ombres décalées, cyan et bleu, comme le A du logo */
   .word.ok {
     text-shadow: -3px 0 0 var(--accent), 3px 0 0 var(--accent-2);
   }
@@ -283,6 +293,7 @@
     font-weight: 500;
     color: var(--text);
   }
+  /* Curseur clignotant de console (immobile si l'utilisateur limite les animations) */
   .cursor {
     display: inline-block;
     width: 8px;

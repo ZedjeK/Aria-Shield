@@ -1,4 +1,7 @@
 <script>
+  // Coquille de l'application : barre latérale (logo, navigation façon
+  // console, « restaurer --tout ») et zone de contenu qui affiche la page
+  // choisie. Il n'y a pas de routeur : app.page suffit, la fenêtre étant unique.
   import { onMount } from 'svelte'
   import Icon from './lib/Icon.svelte'
   import Logo from './lib/Logo.svelte'
@@ -9,6 +12,8 @@
   import Vpn from './pages/Vpn.svelte'
   import Ghost from './pages/Ghost.svelte'
 
+  // Entrées de navigation : label pour les lecteurs d'écran et l'infobulle,
+  // cmd pour l'affichage façon console (« >dns »), icône quand la barre est repliée.
   const nav = [
     { id: 'home', label: 'Accueil', cmd: 'accueil', icon: 'home' },
     { id: 'dns', label: 'Résolveur DNS', cmd: 'dns', icon: 'dns' },
@@ -17,11 +22,14 @@
     { id: 'tests', label: 'Tests', cmd: 'tests', icon: 'tests' },
   ]
 
+  // Pastilles de la barre latérale et bouton « restaurer --tout ».
   const running = $derived(app.status?.dnsRunning ?? false)
   const systemDns = $derived(app.status?.systemDns ?? false)
   const tunnelUp = $derived(app.status?.tunnel?.up ?? false)
   const canRestore = $derived(running || systemDns || tunnelUp)
 
+  // Premier état tout de suite, puis toutes les 5 s : une restauration
+  // automatique (Unbound arrêté, Aria relancée après un plantage) doit se voir.
   onMount(() => {
     refresh()
     startPolling()
@@ -36,6 +44,7 @@
       <span class="brand-name label"><span class="brand-top">ARIA</span><span class="brand-sub">SHIELD</span></span>
     </div>
 
+    <!-- Une pastille cyan : moteur en marche ; lumineuse : il protège tout Windows -->
     <ul class="nav">
       {#each nav as item (item.id)}
         {@const lit = (item.id === 'dns' && running) || (item.id === 'vpn' && tunnelUp)}
@@ -82,6 +91,7 @@
   </nav>
 
   <main class="content">
+    <!-- Bandeaux d'alerte, communs à toutes les pages -->
     {#if app.status && !app.status.admin}
       <p class="banner" role="alert">Lancée sans droits administrateur : le résolveur ne pourra pas démarrer. Relance Aria en admin.</p>
     {/if}
@@ -95,6 +105,7 @@
       </div>
     {/if}
 
+    <!-- Page affichée -->
     {#if app.page === 'home'}
       <Home />
     {:else if app.page === 'dns'}
@@ -110,6 +121,7 @@
 </div>
 
 <style>
+  /* Grille fenêtre : barre latérale fixe + contenu qui défile */
   .shell {
     display: grid;
     grid-template-columns: 216px minmax(0, 1fr);
@@ -292,6 +304,7 @@
   }
 
   /* Fenêtre étroite : la barre latérale se replie en icônes */
+  /* Fenêtre étroite : la barre latérale se replie en icônes (48 px de cible) */
   @media (max-width: 760px) {
     .shell {
       grid-template-columns: 68px minmax(0, 1fr);

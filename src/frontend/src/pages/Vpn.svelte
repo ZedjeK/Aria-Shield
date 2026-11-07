@@ -1,4 +1,9 @@
 <script>
+  // Page « VPN » : carnet de profils WireGuard (import d'un .conf, saisie
+  // manuelle, modification, suppression, choix du profil actif ou bascule à
+  // chaud), état du tunnel et test de connexion. Les clés ne reviennent
+  // jamais du Go : le formulaire de modification les laisse vides, et un champ
+  // vide garde la clé enregistrée.
   import {
     app, saveProfile, deleteProfile, useProfile, importConf, testVPN, formatBytes, formatAgo,
   } from '../lib/state.svelte.js'
@@ -54,6 +59,7 @@
     }
   }
 
+  // Suppression en deux clics : le premier transforme le bouton en « confirmer ».
   async function remove(p) {
     if (confirmDelete !== p.id) {
       confirmDelete = p.id
@@ -80,6 +86,7 @@
   </p>
 
   <div class="grid-2">
+    <!-- Carnet de profils -->
     <section class="card">
       <div class="card-head">
         <h2>Profils</h2>
@@ -128,6 +135,7 @@
       {/if}
     </section>
 
+    <!-- À droite : le formulaire quand on crée ou modifie un profil, sinon l'état du tunnel -->
     {#if editing !== null}
       <section class="card">
         <div class="card-head">
@@ -225,6 +233,7 @@
     {/if}
   </div>
 
+  <!-- Journal de la dernière action (import, bascule, test…) -->
   <section class="card">
     <h2>{app.logTitle || 'Journal'}</h2>
     {#if app.actionError}

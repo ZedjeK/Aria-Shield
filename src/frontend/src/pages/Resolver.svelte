@@ -1,4 +1,7 @@
 <script>
+  // Page « Résolveur DNS » : démarrer Unbound, le tester, puis l'imposer à
+  // tout Windows. L'interrupteur est verrouillé pendant la protection complète,
+  // dont le DNS de Windows fait partie.
   import { onMount } from 'svelte'
   import Switch from '../lib/Switch.svelte'
   import {
@@ -15,6 +18,7 @@
   const resolve = $derived(chip(app.test?.resolveOk, app.test === null))
   const dnssec = $derived(chip(app.test?.dnssecOk, app.test === null))
 
+  // Pourquoi l'interrupteur est grisé (affiché sous lui), "" s'il est utilisable.
   const switchReason = $derived(
     reason ? reason : !running ? 'Démarre d\'abord le résolveur.' : ''
   )
@@ -35,6 +39,7 @@
   </p>
 
   <div class="grid-2">
+    <!-- Unbound : démarrage, arrêt et résultats des deux tests -->
     <section class="card">
       <h2>Résolveur</h2>
       <div class="actions">
@@ -65,6 +70,7 @@
       </div>
     </section>
 
+    <!-- Bascule du DNS de Windows, avec l'état de chaque carte réseau -->
     <section class="card">
       <div class="card-head">
         <span class="row-text">
@@ -105,6 +111,7 @@
     </section>
   </div>
 
+  <!-- Journal de la dernière action -->
   <section class="card">
     <h2>{app.logTitle || 'Journal'}</h2>
     {#if app.actionError}

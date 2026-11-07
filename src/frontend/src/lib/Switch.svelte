@@ -1,5 +1,7 @@
 <script>
-  // Interrupteur façon Windows 11.
+  // Interrupteur façon Windows 11. Accessible : role="switch" et aria-checked,
+  // donc annoncé « activé / désactivé » par les lecteurs d'écran.
+  // onchange reçoit le nouvel état souhaité ; c'est au parent de l'appliquer.
   let { checked = false, disabled = false, label, onchange } = $props()
 </script>
 

@@ -1,4 +1,8 @@
 <script>
+  // Page « Tests » : tout ce qui prouve qu'Aria protège vraiment.
+  // Résolveur (résolution, DNSSEC), Windows (marqueur, cartes), fuites d'IP
+  // (IPv4, IPv6, kill switch) et navigateurs dont le DNS sécurisé contournerait Aria.
+  // Chaque pastille vient de chip() : « En attente » tant que le test n'a pas de sens.
   import { app, testAll, chip } from '../lib/state.svelte.js'
 
   const running = $derived(app.status?.dnsRunning ?? false)
@@ -11,6 +15,7 @@
   const cards = $derived(chip(t?.adaptersOk, !t || !systemDns))
   const browsers = $derived(t?.browsers ?? [])
   const protectedOn = $derived(app.status?.protected ?? false)
+  // Dernier verdict de fuite : celui des tests s'il existe, sinon celui de l'activation.
   const leak = $derived(t?.leak ?? app.status?.leak)
   const v4 = $derived(chip(leak?.v4Ok, !protectedOn || !leak))
   const v6 = $derived(chip(leak?.v6Ok, !protectedOn || !leak))
@@ -27,6 +32,7 @@
   <p class="page-intro">Vérifie que ce qu'Aria annonce est vrai.</p>
 
   <div class="grid-2">
+    <!-- Unbound répond-il, et valide-t-il DNSSEC ? -->
     <section class="card">
       <h2>Résolveur</h2>
       <div class="row">
@@ -51,6 +57,7 @@
       {/if}
     </section>
 
+    <!-- Windows passe-t-il vraiment par Unbound ? -->
     <section class="card">
       <h2>Windows</h2>
       <div class="row">
@@ -73,6 +80,7 @@
     </section>
   </div>
 
+  <!-- Les sites voient-ils encore l'IP de la box ? -->
   <section class="card">
     <h2>Fuites d'IP</h2>
     <div class="row">
@@ -107,6 +115,7 @@
     {/if}
   </section>
 
+  <!-- Navigateurs réglés pour ignorer le DNS de Windows -->
   <section class="card">
     <h2>Navigateurs</h2>
     <p class="card-text">

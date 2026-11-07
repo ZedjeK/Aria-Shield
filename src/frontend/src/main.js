@@ -1,3 +1,5 @@
+// Point d'entrée de l'interface : charge les polices et le thème, puis monte
+// l'application Svelte dans <div id="app"> (index.html).
 import { mount } from 'svelte'
 
 // Polices embarquées dans l'exe : aucune requête vers Google Fonts au lancement.

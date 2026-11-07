@@ -1,6 +1,15 @@
 // État partagé de l'interface et appels au backend Go.
+//
+// Toutes les pages lisent `app` (et `tor` pour le Mode Fantôme) : ce sont des
+// objets réactifs Svelte 5 ($state), donc chaque changement redessine ce qui
+// en dépend. Les fonctions exportées sont les seules à appeler ShieldService
+// (le Go, via les liaisons générées par Wails dans bindings/).
+//
+// Convention : une action longue passe par run(), qui bloque les boutons
+// (app.busy), range le journal de l'action dans app.log et relit l'état.
 import { ShieldService } from '../../bindings/aria-shield'
 
+/** État général de l'interface. */
 export const app = $state({
   page: 'home',
   mode: 'discret',
@@ -16,6 +25,7 @@ export const app = $state({
   adapters: [], // cartes réseau actives
 })
 
+/** Relit l'état DNS des cartes réseau (page Résolveur DNS). */
 export async function loadAdapters() {
   try {
     app.adapters = (await ShieldService.Adapters()) ?? []
@@ -24,8 +34,10 @@ export async function loadAdapters() {
   }
 }
 
+// Texte lisible d'une erreur, qu'elle vienne du Go ou du JavaScript.
 const message = (err) => String(err?.message ?? err)
 
+/** Masque le bandeau d'information (incident DNS, migration…). */
 export async function dismissNotice() {
   try {
     await ShieldService.DismissNotice()
@@ -33,6 +45,7 @@ export async function dismissNotice() {
   refresh()
 }
 
+/** Relit l'état complet (droits, moteurs, protection, profils). */
 export async function refresh() {
   try {
     app.status = await ShieldService.Status()
@@ -51,6 +64,8 @@ export function startPolling() {
   }, 5000)
 }
 
+// Exécute une action du backend : boutons bloqués pendant l'action, journal
+// rangé sous le titre donné, message d'erreur affiché, état relu à la fin.
 async function run(title, fn) {
   app.busy = true
   app.actionError = ''
@@ -71,6 +86,9 @@ async function run(title, fn) {
   }
 }
 
+// ---------- Résolveur ----------
+
+/** Démarre Unbound puis affiche ses tests. */
 export async function startDNS() {
   app.test = null
   app.sysTests = null
@@ -78,12 +96,14 @@ export async function startDNS() {
   if (res && !res.error) app.test = res.test
 }
 
+/** Arrête Unbound. */
 export async function stopDNS() {
   await run('Arrêt du résolveur', () => ShieldService.StopDNS())
   app.test = null
   app.sysTests = null
 }
 
+/** Relance les tests du résolveur (résolution et DNSSEC). */
 export async function testDNS() {
   app.busy = true
   app.actionError = ''
@@ -96,11 +116,13 @@ export async function testDNS() {
   }
 }
 
+/** Fait utiliser le résolveur par tout Windows, puis le vérifie. */
 export async function enableSystemDNS() {
   const res = await run('Bascule de Windows sur le résolveur', () => ShieldService.EnableSystemDNS())
   if (res && !res.error) await testSystem()
 }
 
+/** Rend son DNS d'origine à Windows. */
 export async function disableSystemDNS() {
   await run('Retour au DNS d\'origine', () => ShieldService.DisableSystemDNS())
   app.sysTests = null
@@ -108,6 +130,10 @@ export async function disableSystemDNS() {
 
 // ---------- VPN ----------
 
+/**
+ * Enregistre un profil VPN saisi à la main. id vide = nouveau profil.
+ * Renvoie les erreurs par champ (res.fields) pour le formulaire.
+ */
 export async function saveProfile(id, input) {
   app.busy = true
   app.actionError = ''
@@ -124,10 +150,12 @@ export async function saveProfile(id, input) {
   }
 }
 
+/** Supprime un profil (refusé par le Go s'il sert au tunnel ouvert). */
 export async function deleteProfile(id) {
   await run('Suppression du profil VPN', () => ShieldService.DeleteVPNProfile(id))
 }
 
+/** Choisit le profil actif ; protection active, bascule à chaud vers ce serveur. */
 export async function useProfile(id) {
   const protecting = app.status?.protected
   await run(protecting ? 'Changement de serveur' : 'Choix du profil VPN', () => ShieldService.UseVPNProfile(id))
@@ -139,20 +167,28 @@ export async function importConf() {
   return res
 }
 
+/** Ouvre le tunnel du profil actif quelques secondes pour vérifier les clés. */
 export async function testVPN() {
   await run('Test de connexion au serveur VPN', () => ShieldService.TestVPN())
 }
 
+// ---------- Protection ----------
+
+/** Active le mode Discret : résolveur, DNS de Windows, tunnel et kill switch. */
 export async function protect() {
   app.sysTests = null
   await run('Activation de la protection', () => ShieldService.Protect())
 }
 
+/** Désactive la protection et rend sa connexion d'origine à Windows. */
 export async function unprotect() {
   await run('Désactivation de la protection', () => ShieldService.Unprotect())
   app.sysTests = null
 }
 
+// ---------- Mise en forme ----------
+
+/** 1536 → « 1,5 Ko » (unités françaises, virgule décimale). */
 export function formatBytes(n) {
   if (!n) return '0 o'
   const units = ['o', 'Ko', 'Mo', 'Go', 'To']
@@ -165,6 +201,7 @@ export function formatBytes(n) {
   return `${v.toFixed(i === 0 ? 0 : 1).replace('.', ',')} ${units[i]}`
 }
 
+/** Secondes écoulées → « il y a 12 s », « il y a 3 min »… */
 export function formatAgo(s) {
   if (s === undefined || s === null || s < 0) return 'jamais'
   if (s < 5) return 'à l\'instant'
@@ -174,6 +211,7 @@ export function formatAgo(s) {
 
 // ---------- Mode Fantôme ----------
 
+/** État de Tor Browser et de ses mises à jour (page Mode Fantôme). */
 export const tor = $state({
   state: null, // installé, version, ouvert, progression
   update: null, // résultat de la vérification
@@ -183,6 +221,8 @@ export const tor = $state({
   log: [],
 })
 
+// Pendant une installation ou une mise à jour, l'état est relu toutes les
+// 400 ms pour faire avancer la barre de progression.
 let torTimer = null
 function watchTor(on) {
   clearInterval(torTimer)
@@ -196,6 +236,7 @@ function watchTor(on) {
   }
 }
 
+/** Relit l'état de Tor Browser (installé, version, ouvert). */
 export async function refreshTor() {
   try {
     tor.state = await ShieldService.TorState()
@@ -204,6 +245,7 @@ export async function refreshTor() {
   }
 }
 
+// Une étape Tor : son journal s'ajoute à la suite, une erreur arrête la séquence.
 async function torStep(fn) {
   const res = await fn()
   if (res?.steps?.length) tor.log = [...tor.log, ...res.steps]
@@ -236,6 +278,7 @@ export async function launchTor() {
   }
 }
 
+/** Met à jour Tor Browser (version signée vérifiée), puis le lance. */
 export async function updateAndLaunchTor() {
   tor.busy = true
   tor.error = ''
@@ -255,6 +298,7 @@ export async function updateAndLaunchTor() {
   }
 }
 
+/** Lance la version installée sans mettre à jour (choix de l'utilisateur). */
 export async function launchTorAnyway() {
   tor.busy = true
   tor.error = ''
@@ -269,6 +313,7 @@ export async function launchTorAnyway() {
   }
 }
 
+/** Vérifie seulement s'il existe une nouvelle version. */
 export async function checkTorUpdate() {
   tor.busy = true
   tor.error = ''
@@ -282,6 +327,7 @@ export async function checkTorUpdate() {
   }
 }
 
+/** « restaurer --tout » : tunnel fermé, DNS d'origine, résolveur arrêté. */
 export async function restoreAll() {
   await run('Restauration complète', () => ShieldService.RestoreAll())
   app.test = null
@@ -289,6 +335,9 @@ export async function restoreAll() {
   app.page = 'dns'
 }
 
+// ---------- Tests ----------
+
+/** Tests côté Windows : marqueur DNS, cartes, fuites, navigateurs. */
 export async function testSystem() {
   try {
     app.sysTests = await ShieldService.TestSystem()
@@ -297,6 +346,7 @@ export async function testSystem() {
   }
 }
 
+/** Tous les tests d'un coup (page Tests). */
 export async function testAll() {
   app.busy = true
   app.actionError = ''
@@ -317,6 +367,7 @@ export function blockedReason() {
   return ''
 }
 
+/** Libellé et style d'une pastille de résultat de test. */
 export function chip(ok, pending) {
   if (pending) return { label: 'En attente', cls: 'idle' }
   return ok ? { label: 'OK', cls: 'ok' } : { label: 'Échec', cls: 'fail' }
