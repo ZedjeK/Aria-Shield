@@ -71,6 +71,7 @@ type ShieldService struct {
 	resumeMu   sync.Mutex    // protège resumeStop et resuming
 	resumeStop chan struct{} // fermé quand l'utilisateur reprend la main
 	resuming   string        // réactivation en cours, affichée dans l'interface
+	restarts   []time.Time   // relances automatiques d'Unbound (sous resumeMu)
 }
 
 // NewShieldService prépare le service et ses moteurs (rien n'est lancé).
@@ -129,11 +130,15 @@ func NewShieldService() *ShieldService {
 
 	// Filets de sécurité si Unbound s'arrête tout seul.
 	s.dns.OnUnexpectedExit(func() {
-		if s.tun.Stats().Full {
-			// Protection active : on relance Unbound, sinon on coupe tout proprement.
+		// Windows ou le tunnel comptent sur Unbound : on le relance d'abord (3 fois
+		// en 10 min au plus, pour ne pas boucler sur un Unbound qui plante en série).
+		if (s.tun.Stats().Full || s.sys.Enabled()) && s.allowRestart() {
 			if _, err := s.dns.Start(); err == nil {
 				return
 			}
+		}
+		if s.tun.Stats().Full {
+			// Relance impossible : on coupe tout proprement.
 			s.tun.Down()
 			s.sys.Disable("Unbound s'est arrêté : protection coupée et connexion d'origine remise.")
 			return

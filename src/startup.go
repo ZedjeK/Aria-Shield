@@ -206,6 +206,26 @@ func (s *ShieldService) resumingText() string {
 	return s.resuming
 }
 
+// allowRestart autorise une relance automatique d'Unbound s'il y en a eu moins
+// de 3 dans les 10 dernières minutes.
+func (s *ShieldService) allowRestart() bool {
+	s.resumeMu.Lock()
+	defer s.resumeMu.Unlock()
+	now := time.Now()
+	recent := s.restarts[:0]
+	for _, t := range s.restarts {
+		if now.Sub(t) < 10*time.Minute {
+			recent = append(recent, t)
+		}
+	}
+	s.restarts = recent
+	if len(recent) >= 3 {
+		return false
+	}
+	s.restarts = append(s.restarts, now)
+	return true
+}
+
 // addNotice ajoute un message au bandeau d'information.
 func (s *ShieldService) addNotice(text string) {
 	s.noticeMu.Lock()

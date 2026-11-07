@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -99,6 +100,12 @@ func TestHelperRefusesBadArguments(t *testing.T) {
 }
 
 func TestHelperReportsFailureWithNonce(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		// Sous Windows (et sur GitHub, où Tor Browser est téléchargé avant les
+		// tests), l'installeur fonctionne vraiment : le cas d'échec n'y est pas
+		// reproductible sans installer Tor Browser pour de bon.
+		t.Skip("l'installeur de Tor Browser fonctionne sous Windows")
+	}
 	dir := t.TempDir()
 	// Hors Windows, l'installeur ne peut pas tourner : l'assistant doit le dire
 	// dans son fichier d'avancement, avec le bon jeton, et sortir en échec.
