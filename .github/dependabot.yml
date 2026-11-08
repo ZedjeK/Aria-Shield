@@ -18,6 +18,9 @@ updates:
     groups:
       mises-a-jour-mineures:
         update-types: ["minor", "patch"]
+    ignore:
+      # Wails v3 est encore en bêta : le module Go et le runtime JS montent ensemble, à la main.
+      - dependency-name: "github.com/wailsapp/wails/v3"
   - package-ecosystem: "npm"
     directory: "/src/frontend"
     schedule:
@@ -26,3 +29,6 @@ updates:
     groups:
       mises-a-jour-mineures:
         update-types: ["minor", "patch"]
+    ignore:
+      # Wails v3 est encore en bêta : le module Go et le runtime JS montent ensemble, à la main.
+      - dependency-name: "@wailsio/runtime"
