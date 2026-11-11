@@ -1,7 +1,9 @@
 # Compile Aria-Shield.exe sur une machine Windows de GitHub.
 #
 # - push sur main : compilation + tests, l'exe est gardé 7 jours comme artefact.
-# - tag v* : idem, puis attestation de provenance et publication de la release.
+# - tag v* : idem, puis attestation de provenance et release créée EN BROUILLON :
+#   elle reste invisible du public tant qu'elle n'est pas publiée à la main,
+#   après relecture (page Releases, ou : gh release edit vX.Y --draft=false).
 #   Les notes viennent de docs/releases/<tag>.md, l'empreinte SHA-256 est ajoutée.
 #
 # Vérifier qu'un exe publié vient bien de ce dépôt :
@@ -153,4 +155,5 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --title "Aria Shield $GITHUB_REF_NAME" \
             --notes-file release-notes.md \
-            --verify-tag
+            --verify-tag \
+            --draft
