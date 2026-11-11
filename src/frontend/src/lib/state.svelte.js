@@ -335,6 +335,50 @@ export async function restoreAll() {
   app.page = 'dns'
 }
 
+// ---------- Blocage des pubs ----------
+
+/** État du blocage des pubs (page Résolveur DNS). */
+export const ads = $state({
+  data: null, // { enabled, active, list: { present, count, updated }, allow, source, url }
+  error: '',
+})
+
+/** Relit l'état du blocage. */
+export async function loadAds() {
+  try {
+    ads.data = await ShieldService.AdBlock()
+    ads.error = ''
+  } catch (err) {
+    ads.error = message(err)
+  }
+}
+
+/** Active ou coupe le blocage (télécharge la liste au besoin, redémarre Unbound). */
+export async function setAdBlock(on) {
+  await run(on ? 'Activation du blocage des pubs' : 'Arrêt du blocage des pubs', () => ShieldService.SetAdBlock(on))
+  await loadAds()
+  app.sysTests = null
+}
+
+/** Retélécharge la liste maintenant. */
+export async function updateBlocklist() {
+  await run('Mise à jour de la liste de blocage', () => ShieldService.UpdateBlocklist())
+  await loadAds()
+}
+
+/** Ajoute une exception. Renvoie true si elle a été acceptée. */
+export async function addAllow(domain) {
+  const res = await run('Exception au blocage', () => ShieldService.AddAllow(domain))
+  await loadAds()
+  return Boolean(res && !res.error)
+}
+
+/** Retire une exception. */
+export async function removeAllow(domain) {
+  await run('Exception au blocage', () => ShieldService.RemoveAllow(domain))
+  await loadAds()
+}
+
 // ---------- Réglages ----------
 
 /** Réglages de démarrage (lus à l'ouverture de la page Réglages). */

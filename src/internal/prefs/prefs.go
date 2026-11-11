@@ -22,6 +22,7 @@ import (
 const (
 	fileName = "reglages.json"
 	maxSize  = 64 << 10
+	maxAllow = 200 // exceptions au blocage des pubs
 )
 
 // Dernière protection active, réactivée au lancement suivant.
@@ -39,6 +40,11 @@ type Prefs struct {
 	Last string `json:"derniere"`
 	// Notify : notifications Windows (incidents, sortie d'Aria).
 	Notify bool `json:"notifications"`
+	// BlockAds : blocage des pubs et des traceurs par le résolveur.
+	BlockAds bool `json:"blocage-pubs"`
+	// Allow : domaines que l'utilisateur ne veut pas voir bloqués. Revalidés
+	// par le paquet blocklist avant tout usage.
+	Allow []string `json:"exceptions,omitempty"`
 }
 
 // defaults : reprise et notifications activées, rien à reprendre au premier lancement.
@@ -81,6 +87,9 @@ func (s *Store) loadLocked() Prefs {
 	case None, DNS, Discret:
 	default:
 		p.Last = None
+	}
+	if len(p.Allow) > maxAllow {
+		p.Allow = p.Allow[:maxAllow]
 	}
 	return p
 }

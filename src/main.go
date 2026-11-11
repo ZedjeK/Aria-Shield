@@ -24,7 +24,7 @@ import (
 )
 
 // Version affichée dans l'interface (garder la même dans build/windows/info.json).
-const Version = "0.9.0"
+const Version = "0.10.0"
 
 // L'interface compilée par Vite est embarquée dans l'exe : rien n'est chargé
 // depuis internet ni depuis le disque.

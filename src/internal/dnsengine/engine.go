@@ -91,6 +91,33 @@ type Engine struct {
 	ipv6     bool          // Unbound écoute aussi sur ::1
 	stopping bool          // arrêt demandé par Aria : ce n'est pas un plantage
 	onExit   func()        // appelé si Unbound s'arrête tout seul
+	include  string        // fichier de règles en plus (blocage des pubs), "" si aucun
+}
+
+// SetInclude fait charger à Unbound, au prochain démarrage, un fichier de
+// règles supplémentaire ("" pour aucun). Le fichier doit vivre dans le dossier
+// verrouillé : Unbound le lit en administrateur.
+func (e *Engine) SetInclude(path string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.include = path
+}
+
+// Include renvoie le fichier de règles supplémentaire en vigueur.
+func (e *Engine) Include() string {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.include
+}
+
+// Answers indique si Unbound répond à name par au moins un enregistrement,
+// sans erreur : vrai pour un nom que la liste de blocage renvoie vers 0.0.0.0.
+func (e *Engine) Answers(name string) bool {
+	if !e.Running() {
+		return false
+	}
+	ans, err := Query(listenAddr, name, probeTimeout)
+	return err == nil && ans.Rcode == RcodeNoError && ans.Answers > 0
 }
 
 // OnUnexpectedExit enregistre une fonction appelée si Unbound s'arrête
@@ -154,6 +181,15 @@ func RenderConfig(dir string, ipv6 bool) string {
 	return strings.ReplaceAll(conf, "{{DIR}}", filepath.ToSlash(dir))
 }
 
+// includeLine ajoute à la config le chargement d'un fichier de règles.
+func includeLine(path string) string {
+	if path == "" {
+		return ""
+	}
+	return "\n# Blocage des pubs et des traceurs (fichier généré par Aria)\n" +
+		`include: "` + filepath.ToSlash(path) + `"` + "\n"
+}
+
 // ipv6Loopback vérifie que ::1 est utilisable sur cette machine.
 func ipv6Loopback() bool {
 	c, err := net.ListenPacket("udp6", "[::1]:0")
@@ -201,7 +237,8 @@ func (e *Engine) prepare(add func(string, bool, string)) (exePath, confPath stri
 
 	e.ipv6 = ipv6Loopback()
 	confPath = filepath.Join(dir, "unbound.conf")
-	if err := os.WriteFile(confPath, []byte(RenderConfig(dir, e.ipv6)), 0o644); err != nil {
+	conf := RenderConfig(dir, e.ipv6) + includeLine(e.include)
+	if err := os.WriteFile(confPath, []byte(conf), 0o644); err != nil {
 		add("Configuration", false, err.Error())
 		return "", "", err
 	}

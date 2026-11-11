@@ -33,6 +33,7 @@ import (
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
+	"aria-shield/internal/blocklist"
 	"aria-shield/internal/browsers"
 	"aria-shield/internal/dnsengine"
 	"aria-shield/internal/leak"
@@ -75,6 +76,9 @@ type ShieldService struct {
 	restarts   []time.Time   // relances automatiques d'Unbound (sous resumeMu)
 	notify     *notifier     // notifications Windows (notify.go), posé par main
 	quitting   atomic.Bool   // Aria est en train de quitter
+
+	ads  *blocklist.Store // liste de blocage des pubs (adblock.go)
+	adMu sync.Mutex       // une seule opération sur la liste à la fois
 }
 
 // NewShieldService prépare le service et ses moteurs (rien n'est lancé).
@@ -130,6 +134,11 @@ func NewShieldService() *ShieldService {
 	s.store = vpn.NewStore(userDir)
 	s.tor = torbrowser.New(userDir)
 	s.prefs = prefs.New(userDir)
+	// La liste de blocage vit avec Unbound, dans le dossier verrouillé.
+	s.ads = blocklist.NewStore(unboundDir)
+	if s.prefs.Load().BlockAds {
+		s.dns.SetInclude(s.ads.ConfPath())
+	}
 
 	// Filets de sécurité si Unbound s'arrête tout seul.
 	s.dns.OnUnexpectedExit(func() {
@@ -178,6 +187,7 @@ type Status struct {
 	Leak       *leak.Verdict `json:"leak"`
 	Components []Component   `json:"components"`
 	Resuming   string        `json:"resuming"` // réactivation automatique en cours
+	AdBlock    bool          `json:"adBlock"`  // pubs bloquées par le résolveur en cours
 	Version    string        `json:"version"`
 }
 
@@ -218,6 +228,9 @@ type SystemTests struct {
 	Leak           *leak.Verdict   `json:"leak"`
 	KillSwitch     bool            `json:"killSwitch"`
 	Browsers       []browsers.Info `json:"browsers"`
+	AdBlockOn      bool            `json:"adBlockOn"` // blocage des pubs demandé
+	AdBlockOK      bool            `json:"adBlockOk"`
+	AdBlockDetail  string          `json:"adBlockDetail"`
 }
 
 // ServiceStartup : si Aria avait planté en laissant Windows sur le résolveur, on
@@ -227,6 +240,7 @@ func (s *ShieldService) ServiceStartup(ctx context.Context, options application.
 	s.sys.RecoverLeftover()
 	go s.refreshAutostart()
 	go s.resume()
+	go s.refreshBlocklist()
 	return nil
 }
 
@@ -298,6 +312,7 @@ func (s *ShieldService) Status() Status {
 			tor,
 		},
 		Resuming: s.resumingText(),
+		AdBlock:  s.adBlockActive(),
 		Version:  Version,
 	}
 }
@@ -811,6 +826,20 @@ func (s *ShieldService) TestSystem() SystemTests {
 		s.mu.Lock()
 		s.lastLeak = t.Leak
 		s.mu.Unlock()
+	}
+
+	// Blocage des pubs : le nom témoin de la liste doit répondre (0.0.0.0).
+	t.AdBlockOn = s.prefs.Load().BlockAds
+	switch {
+	case !t.AdBlockOn:
+		t.AdBlockDetail = "Blocage des pubs désactivé"
+	case !s.dns.Running():
+		t.AdBlockDetail = "Le résolveur est arrêté"
+	case s.dns.Answers(blocklist.Canary):
+		t.AdBlockOK = true
+		t.AdBlockDetail = "La liste est chargée : " + countNote(s.ads.Info()) + " bloqués"
+	default:
+		t.AdBlockDetail = "Le résolveur tourne sans la liste de blocage"
 	}
 
 	if !s.sys.Enabled() {

@@ -13,6 +13,7 @@
   const dnssec = $derived(chip(app.test?.dnssecOk, app.test === null))
   const marker = $derived(chip(t?.markerOk, !t || !systemDns))
   const cards = $derived(chip(t?.adaptersOk, !t || !systemDns))
+  const adblock = $derived(chip(t?.adBlockOk, !t || !t.adBlockOn || !running))
   const browsers = $derived(t?.browsers ?? [])
   const protectedOn = $derived(app.status?.protected ?? false)
   // Dernier verdict de fuite : celui des tests s'il existe, sinon celui de l'activation.
@@ -48,6 +49,13 @@
           <span class="row-detail">Une signature cassée doit être rejetée</span>
         </span>
         <span class="chip {dnssec.cls}">{dnssec.label}</span>
+      </div>
+      <div class="row">
+        <span class="row-text">
+          <span class="row-name">Blocage des pubs</span>
+          <span class="row-detail">{t?.adBlockDetail || 'Un nom témoin de la liste doit être bloqué'}</span>
+        </span>
+        <span class="chip {adblock.cls}">{adblock.label}</span>
       </div>
       {#if app.test?.detail}
         <p class="card-text">{app.test.detail}</p>

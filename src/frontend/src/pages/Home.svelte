@@ -47,7 +47,10 @@
       : { id: 'leak', page: 'tests', tag: 'ready', name: 'fuites', detail: 'vérifiées à l\'activation' },
   ])
   const ip = $derived(protectedOn ? leak?.after?.v4 || 'celle du VPN' : 'celle de ta box')
-  const dns = $derived(protectedOn ? 'Unbound via le tunnel' : systemDns ? 'Unbound local' : 'DNS du FAI')
+  const dns = $derived(
+    (protectedOn ? 'Unbound via le tunnel' : systemDns ? 'Unbound local' : 'DNS du FAI') +
+      ((protectedOn || systemDns) && app.status?.adBlock ? ' · pubs bloquées' : ''),
+  )
 </script>
 
 <div class="page">
