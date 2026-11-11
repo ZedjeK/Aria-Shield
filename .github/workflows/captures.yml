@@ -1,0 +1,75 @@
+# Captures d'écran de l'interface à plusieurs largeurs (420, 760, 980 et
+# 1400 px, plus la fenêtre par défaut et la fenêtre minimale), avec des données
+# fictives : src/frontend/captures.
+#
+# Elles servent à relire la mise en page sans lancer l'exe, et sont gardées
+# 7 jours en artefact. Ce workflow ne touche pas à l'exe, ne publie rien et n'a
+# aucun droit d'écriture.
+
+name: Captures de l'interface
+
+on:
+  push:
+    branches: [main]
+    paths: ['src/frontend/**', '.github/workflows/captures.yml']
+  # Sur une PR qui touche l'interface : les captures permettent de la relire
+  # avant fusion. Jeton en lecture seule, aucun secret.
+  pull_request:
+    paths: ['src/frontend/**', '.github/workflows/captures.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: captures-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  captures:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: src/frontend
+
+    steps:
+      - name: Sources
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: lts/*
+
+      - name: Dépendances de l'interface
+        run: npm ci
+
+      - name: Interface compilée avec le faux service
+        run: npx vite build --config vite.captures.config.js
+
+      # Version figée ; installée pour ce job seulement, hors package.json.
+      - name: Playwright et Chromium
+        run: |
+          npm install --no-save playwright@1.64.1
+          npx playwright install --with-deps chromium
+
+      - name: Captures
+        run: |
+          npx vite preview --config vite.captures.config.js > preview.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -fs http://localhost:4173/ > /dev/null && break
+            sleep 1
+          done
+          node captures/capture.mjs
+
+      - name: Captures gardées 7 jours
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: Captures-${{ github.sha }}
+          path: src/frontend/captures-out
+          retention-days: 7
+          if-no-files-found: warn

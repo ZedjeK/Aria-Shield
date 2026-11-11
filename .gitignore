@@ -17,6 +17,9 @@ AriaShield-data/
 # Frontend
 node_modules/
 src/frontend/dist/
+# Captures d'écran de l'interface (src/frontend/captures)
+src/frontend/dist-captures/
+src/frontend/captures-out/
 src/frontend/bindings/
 
 # Divers
