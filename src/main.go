@@ -45,6 +45,7 @@ func main() {
 	silent := slices.Contains(os.Args[1:], autostart.SilentArg)
 
 	svc := NewShieldService()
+	svc.logStart(silent)
 	svc.notify = newNotifier(svc.prefs)
 	var window *application.WebviewWindow
 	showWindow := func() {
@@ -66,6 +67,7 @@ func main() {
 		SingleInstance: &application.SingleInstanceOptions{
 			UniqueID: "com.zedjek.aria-shield",
 			OnSecondInstanceLaunch: func(application.SecondInstanceData) {
+				svc.logf("exe relancé alors qu'Aria tourne déjà : fenêtre ramenée au premier plan")
 				application.InvokeAsync(showWindow)
 			},
 		},

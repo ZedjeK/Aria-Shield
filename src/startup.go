@@ -46,7 +46,7 @@ func (s *ShieldService) Settings() Settings {
 }
 
 // SetAutostart crée ou supprime la tâche qui lance Aria à l'ouverture de session.
-func (s *ShieldService) SetAutostart(on bool) SystemResult {
+func (s *ShieldService) doSetAutostart(on bool) SystemResult {
 	exe, err := os.Executable()
 	if err != nil {
 		return SystemResult{Error: "emplacement de l'exe introuvable : " + err.Error()}
@@ -77,7 +77,7 @@ func (s *ShieldService) SetAutostart(on bool) SystemResult {
 }
 
 // SetResume active ou non la réactivation de la dernière protection au lancement.
-func (s *ShieldService) SetResume(on bool) SystemResult {
+func (s *ShieldService) doSetResume(on bool) SystemResult {
 	if err := s.prefs.Update(func(p *prefs.Prefs) { p.Resume = on }); err != nil {
 		return SystemResult{Error: "réglage non enregistré : " + err.Error()}
 	}
@@ -85,7 +85,7 @@ func (s *ShieldService) SetResume(on bool) SystemResult {
 }
 
 // SetNotifications active ou non les notifications Windows.
-func (s *ShieldService) SetNotifications(on bool) SystemResult {
+func (s *ShieldService) doSetNotifications(on bool) SystemResult {
 	label := "Notifications Windows activées"
 	if !on {
 		label = "Notifications Windows désactivées"
@@ -106,12 +106,14 @@ func (s *ShieldService) Quit() {
 // quit prévient puis quitte (menu de l'icône ou bouton de l'interface).
 func (s *ShieldService) quit() {
 	s.quitting.Store(true)
+	s.logf("« Quitter » demandé")
 	s.alert("Aria Shield est fermée", "Ta connexion d'origine est rétablie. Relance Aria pour retrouver ta protection.")
 	application.Get().Quit()
 }
 
 // alert envoie une notification Windows (si elles sont activées).
 func (s *ShieldService) alert(title, body string) {
+	s.logf("notification : %s : %s", title, body)
 	if s.notify != nil {
 		s.notify.send(title, body)
 	}
@@ -129,7 +131,12 @@ func (s *ShieldService) refreshAutostart() {
 	if err != nil {
 		return
 	}
-	if _, err := autostart.Refresh(exe); err != nil {
+	updated, err := autostart.Refresh(exe)
+	if updated {
+		s.logf("copie de Program Files remise à jour depuis %s", exe)
+	}
+	if err != nil {
+		s.logf("copie de Program Files non mise à jour : %v", err)
 		s.addNotice("La copie d'Aria lancée au démarrage de Windows n'a pas pu être mise à jour : " + err.Error())
 	}
 }
@@ -151,6 +158,11 @@ func (s *ShieldService) resume() {
 	for attempt := 1; ; attempt++ {
 		s.setResuming(fmt.Sprintf("Réactivation de %s (essai %d)…", what, attempt))
 		msg := s.resumeOnce(p.Last)
+		if msg == "" {
+			s.logf("réactivation de %s : réussie (essai %d)", what, attempt)
+		} else {
+			s.logf("réactivation de %s : essai %d en échec : %s", what, attempt, msg)
+		}
 		select {
 		case <-stop:
 			return // l'utilisateur a repris la main entre-temps
