@@ -36,6 +36,7 @@ import (
 	"aria-shield/internal/blocklist"
 	"aria-shield/internal/browsers"
 	"aria-shield/internal/dnsengine"
+	"aria-shield/internal/journal"
 	"aria-shield/internal/leak"
 	"aria-shield/internal/paths"
 	"aria-shield/internal/prefs"
@@ -77,6 +78,7 @@ type ShieldService struct {
 	notify     *notifier     // notifications Windows (notify.go), posé par main
 	quitting   atomic.Bool   // Aria est en train de quitter
 
+	log  *journal.Journal // aria.log (journal.go)
 	ads  *blocklist.Store // liste de blocage des pubs (adblock.go)
 	adMu sync.Mutex       // une seule opération sur la liste à la fois
 }
@@ -106,6 +108,10 @@ func NewShieldService() *ShieldService {
 			aside+" : examine-le avec un antivirus avant de le supprimer")
 	}
 	s.userDir, s.sysDir = userDir, sysDir
+	var logErr error
+	if s.log, logErr = journal.Open(userDir); logErr != nil {
+		errs = append(errs, "journal aria.log non ouvert : "+logErr.Error())
+	}
 
 	// Les versions jusqu'à la v0.6.1 rangeaient tout à côté de l'exe.
 	if legacy := paths.LegacyDir(); legacy != "" {
@@ -144,8 +150,10 @@ func NewShieldService() *ShieldService {
 	s.dns.OnUnexpectedExit(func() {
 		// Windows ou le tunnel comptent sur Unbound : on le relance d'abord (3 fois
 		// en 10 min au plus, pour ne pas boucler sur un Unbound qui plante en série).
+		s.logf("Unbound s'est arrêté tout seul")
 		if (s.tun.Stats().Full || s.sys.Enabled()) && s.allowRestart() {
 			if _, err := s.dns.Start(); err == nil {
+				s.logf("Unbound relancé automatiquement")
 				return
 			}
 		}
@@ -187,6 +195,7 @@ type Status struct {
 	Leak       *leak.Verdict `json:"leak"`
 	Components []Component   `json:"components"`
 	Resuming   string        `json:"resuming"` // réactivation automatique en cours
+	LogPath    string        `json:"logPath"`  // journal aria.log
 	AdBlock    bool          `json:"adBlock"`  // pubs bloquées par le résolveur en cours
 	Version    string        `json:"version"`
 }
@@ -237,7 +246,9 @@ type SystemTests struct {
 // répare ; puis, en arrière-plan, la dernière protection est réactivée et la
 // copie lancée au démarrage de Windows remise à jour (startup.go).
 func (s *ShieldService) ServiceStartup(ctx context.Context, options application.ServiceOptions) error {
-	s.sys.RecoverLeftover()
+	if recovered, steps := s.sys.RecoverLeftover(); recovered {
+		s.logResult("DNS laissé sur Aria par une session interrompue : restauration", steps, "")
+	}
 	go s.refreshAutostart()
 	go s.resume()
 	go s.refreshBlocklist()
@@ -249,6 +260,8 @@ func (s *ShieldService) ServiceStartup(ctx context.Context, options application.
 // reste dans la zone de notification (main.go).
 func (s *ShieldService) ServiceShutdown() error {
 	s.quitting.Store(true)
+	s.logf("arrêt d'Aria : tunnel fermé, DNS d'origine remis, résolveur arrêté")
+	defer s.log.Close()
 	s.cancelResume()
 	s.tun.Down()
 	if s.sys.Enabled() {
@@ -312,6 +325,7 @@ func (s *ShieldService) Status() Status {
 			tor,
 		},
 		Resuming: s.resumingText(),
+		LogPath:  s.log.Path(),
 		AdBlock:  s.adBlockActive(),
 		Version:  Version,
 	}
@@ -325,7 +339,7 @@ func (s *ShieldService) Adapters() []sysdns.AdapterView {
 // ---------- Résolveur ----------
 
 // StartDNS démarre le résolveur embarqué puis le teste.
-func (s *ShieldService) StartDNS() ActionResult {
+func (s *ShieldService) doStartDNS() ActionResult {
 	s.cancelResume()
 	steps, err := s.dns.Start()
 	res := ActionResult{Steps: steps}
@@ -338,7 +352,7 @@ func (s *ShieldService) StartDNS() ActionResult {
 }
 
 // StopDNS rend son DNS à Windows si besoin, puis arrête le résolveur.
-func (s *ShieldService) StopDNS() SystemResult {
+func (s *ShieldService) doStopDNS() SystemResult {
 	s.cancelResume()
 	if s.tun.Stats().Full {
 		return SystemResult{Error: "désactive d'abord la protection : le résolveur en fait partie"}
@@ -365,6 +379,7 @@ func (s *ShieldService) EnableSystemDNS() SystemResult {
 	if res.Error == "" {
 		s.remember(prefs.DNS)
 	}
+	s.logResult("Bascule de Windows sur le résolveur", res.Steps, res.Error)
 	return res
 }
 
@@ -393,7 +408,7 @@ func (s *ShieldService) enableSystemDNS() ([]Step, string) {
 }
 
 // DisableSystemDNS rend son DNS d'origine à Windows.
-func (s *ShieldService) DisableSystemDNS() SystemResult {
+func (s *ShieldService) doDisableSystemDNS() SystemResult {
 	s.cancelResume()
 	if s.tun.Stats().Full {
 		return SystemResult{Error: "désactive d'abord la protection : le DNS de Windows en fait partie"}
@@ -445,7 +460,7 @@ func (s *ShieldService) SaveVPNProfile(id string, in vpn.Input) SaveResult {
 // choisis. Les fichiers sont lus ici, côté Go : les clés ne transitent jamais
 // par l'interface. (Le glisser-déposer est impossible : Windows bloque les
 // dépôts de l'Explorateur vers une appli lancée en administrateur.)
-func (s *ShieldService) ImportVPNConf() ImportResult {
+func (s *ShieldService) doImportVPNConf() ImportResult {
 	files, err := application.Get().Dialog.OpenFile().
 		SetTitle("Importer une configuration WireGuard").
 		AddFilter("Configuration WireGuard (*.conf)", "*.conf").
@@ -514,7 +529,7 @@ func (s *ShieldService) importOne(path string) (vpn.Profile, []string, error) {
 }
 
 // DeleteVPNProfile efface un profil (pas celui qu'utilise le tunnel ouvert).
-func (s *ShieldService) DeleteVPNProfile(id string) SystemResult {
+func (s *ShieldService) doDeleteVPNProfile(id string) SystemResult {
 	book, err := s.store.Load()
 	if err != nil {
 		return SystemResult{Error: err.Error()}
@@ -535,7 +550,7 @@ func (s *ShieldService) DeleteVPNProfile(id string) SystemResult {
 // UseVPNProfile choisit le profil de la protection. Si la protection est
 // active, Aria bascule à chaud vers ce serveur, kill switch maintenu : en cas
 // d'échec, elle revient au serveur précédent.
-func (s *ShieldService) UseVPNProfile(id string) SystemResult {
+func (s *ShieldService) doUseVPNProfile(id string) SystemResult {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	var res SystemResult
@@ -608,7 +623,7 @@ func (s *ShieldService) UseVPNProfile(id string) SystemResult {
 
 // TestVPN ouvre le tunnel quelques secondes, sans routes ni kill switch,
 // pour vérifier que le serveur répond.
-func (s *ShieldService) TestVPN() SystemResult {
+func (s *ShieldService) doTestVPN() SystemResult {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	var res SystemResult
@@ -678,6 +693,7 @@ func (s *ShieldService) Protect() SystemResult {
 	if s.tun.Stats().Full {
 		s.remember(prefs.Discret)
 	}
+	s.logResult("Activation de la protection", res.Steps, res.Error)
 	return res
 }
 
@@ -783,7 +799,7 @@ func (s *ShieldService) rollbackLocked() []Step {
 }
 
 // Unprotect désactive la protection et rend sa connexion d'origine à Windows.
-func (s *ShieldService) Unprotect() SystemResult {
+func (s *ShieldService) doUnprotect() SystemResult {
 	s.cancelResume()
 	s.remember(prefs.None)
 	s.mu.Lock()
@@ -802,8 +818,8 @@ func (s *ShieldService) Unprotect() SystemResult {
 }
 
 // RestoreAll remet tout comme avant Aria : tunnel, DNS de Windows, puis arrêt d'Unbound.
-func (s *ShieldService) RestoreAll() SystemResult {
-	res := s.Unprotect()
+func (s *ShieldService) doRestoreAll() SystemResult {
+	res := s.doUnprotect()
 	s.dns.Stop()
 	res.Steps = append(res.Steps, Step{Label: "Résolveur arrêté", OK: true})
 	return res
@@ -883,7 +899,7 @@ func (s *ShieldService) TorState() torbrowser.State {
 }
 
 // TorPrepare extrait la version embarquée si Tor Browser n'est pas encore là.
-func (s *ShieldService) TorPrepare() SystemResult {
+func (s *ShieldService) doTorPrepare() SystemResult {
 	if s.tor.State().Installed {
 		return SystemResult{Steps: []Step{}}
 	}
@@ -906,7 +922,7 @@ func (s *ShieldService) TorCheckUpdate() torbrowser.UpdateInfo {
 }
 
 // TorUpdate installe la version trouvée par la dernière vérification.
-func (s *ShieldService) TorUpdate() SystemResult {
+func (s *ShieldService) doTorUpdate() SystemResult {
 	s.torMu.Lock()
 	info := s.torUpdate
 	s.torMu.Unlock()
@@ -921,7 +937,7 @@ func (s *ShieldService) TorUpdate() SystemResult {
 }
 
 // TorLaunch démarre Tor Browser sans droits administrateur.
-func (s *ShieldService) TorLaunch() SystemResult {
+func (s *ShieldService) doTorLaunch() SystemResult {
 	if err := s.tor.Launch(); err != nil {
 		return SystemResult{Steps: []Step{{Label: "Lancement de Tor Browser", OK: false, Note: err.Error()}}, Error: err.Error()}
 	}

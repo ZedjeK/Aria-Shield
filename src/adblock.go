@@ -62,7 +62,7 @@ func (s *ShieldService) adBlockActive() bool {
 // SetAdBlock active ou coupe le blocage. À l'activation, la liste est
 // téléchargée si elle manque ou date de plus d'une semaine ; si le
 // téléchargement échoue et qu'aucune liste n'est installée, rien n'est activé.
-func (s *ShieldService) SetAdBlock(on bool) SystemResult {
+func (s *ShieldService) doSetAdBlock(on bool) SystemResult {
 	s.adMu.Lock()
 	defer s.adMu.Unlock()
 	var res SystemResult
@@ -97,7 +97,7 @@ func (s *ShieldService) SetAdBlock(on bool) SystemResult {
 }
 
 // UpdateBlocklist retélécharge la liste maintenant.
-func (s *ShieldService) UpdateBlocklist() SystemResult {
+func (s *ShieldService) doUpdateBlocklist() SystemResult {
 	s.adMu.Lock()
 	defer s.adMu.Unlock()
 	var res SystemResult
@@ -117,7 +117,7 @@ func (s *ShieldService) UpdateBlocklist() SystemResult {
 }
 
 // AddAllow ajoute une exception : ce domaine et ses sous-domaines ne sont plus bloqués.
-func (s *ShieldService) AddAllow(domain string) SystemResult {
+func (s *ShieldService) doAddAllow(domain string) SystemResult {
 	d, ok := blocklist.ValidDomain(domain)
 	if !ok {
 		return SystemResult{Error: "ce n'est pas un nom de domaine (exemple : suivi.exemple.fr)"}
@@ -128,7 +128,7 @@ func (s *ShieldService) AddAllow(domain string) SystemResult {
 }
 
 // RemoveAllow retire une exception.
-func (s *ShieldService) RemoveAllow(domain string) SystemResult {
+func (s *ShieldService) doRemoveAllow(domain string) SystemResult {
 	d, _ := blocklist.ValidDomain(domain)
 	return s.changeAllow("Exception retirée : "+d, func(allow []string) []string {
 		out := allow[:0:0]
@@ -225,11 +225,18 @@ func (s *ShieldService) refreshBlocklist() {
 	if !p.BlockAds || !s.ads.Stale() {
 		return
 	}
-	if _, err := s.ads.Update(context.Background(), p.Allow); err != nil {
+	info, err := s.ads.Update(context.Background(), p.Allow)
+	if err != nil {
+		s.logf("mise à jour hebdomadaire de la liste de blocage : échec : %v", err)
 		return
 	}
 	var res SystemResult
-	s.applyBlocklist(true, func(string, bool, string) {}, &res)
+	add := func(label string, ok bool, note string) {
+		res.Steps = append(res.Steps, Step{Label: label, OK: ok, Note: note})
+	}
+	add("Liste "+blocklist.SourceName+" téléchargée et filtrée", true, countNote(info))
+	s.applyBlocklist(true, add, &res)
+	s.logResult("Mise à jour hebdomadaire de la liste de blocage", res.Steps, res.Error)
 }
 
 // countNote : « 60 312 domaines », pour le journal.

@@ -88,6 +88,9 @@
       {#if app.status?.dataDir}
         <p class="path">Dossier système (administrateurs) : {app.status.dataDir}</p>
       {/if}
+      {#if app.status?.logPath}
+        <p class="path">Journal de ce qu'Aria a fait : {app.status.logPath}</p>
+      {/if}
     </section>
   </div>
 

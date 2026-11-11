@@ -68,7 +68,7 @@ Aria ne dépose rien à côté de l'exe. Tout va dans deux dossiers :
 
 | Dossier | Contenu | Accès |
 | --- | --- | --- |
-| `%USERPROFILE%\.Aria-Shield` | Tes données : profils VPN chiffrés, Tor Browser et ses favoris, cache de l'interface (`webview`) | Ton compte |
+| `%USERPROFILE%\.Aria-Shield` | Tes données : profils VPN chiffrés, Tor Browser et ses favoris, cache de l'interface (`webview`), réglages et journal (`aria.log`) | Ton compte |
 | `%PROGRAMDATA%\AriaShield` | Ce qu'Aria exécute en administrateur (Unbound), la photo de ton DNS d'origine et la liste de blocage des pubs | Administrateurs et système uniquement |
 
 Le second est créé déjà verrouillé, pour qu'aucun programme sans droits admin ne puisse y glisser un faux exécutable ou une DLL qu'Aria lancerait ensuite. S'il existe déjà sans avoir été créé par Aria (propriétaire inattendu, ou lien vers un autre dossier), il est mis de côté sous le nom `AriaShield.suspect-<date>` et remplacé par un dossier neuf ; Aria te prévient au lancement. Si le verrouillage échoue, Aria refuse de lancer Unbound.
@@ -105,6 +105,10 @@ Pour revenir à la normale à tout moment : « restaurer --tout », en bas de la
 - **Aucune fuite pendant une bascule** : changer de serveur garde la même carte réseau et le même kill switch ; si le nouveau serveur ne répond pas, Aria revient sur l'ancien.
 - **Composants vérifiés** : chaque binaire embarqué vient de la source officielle, avec sa signature vérifiée (voir plus bas). Aria revérifie leur empreinte ou leur signature avant chaque utilisation.
 - **Tor Browser jamais en administrateur** : Aria tourne en admin, mais installe, met à jour et lance Tor Browser avec tes droits normaux. L'installation et les mises à jour passent par un assistant (le même exe, relancé sans élévation) : Aria ne fait que lire le dossier de Tor Browser, si bien qu'un programme sans droits ne peut pas s'en servir pour faire écrire Aria ailleurs sur le disque.
+
+### Journal
+
+Aria note ce qu'elle fait dans `%USERPROFILE%\.Aria-Shield\aria.log` : chaque action demandée et son résultat, les réactivations au lancement, les relances d'Unbound, les notifications, l'arrêt. Aucune clé ni contenu de profil VPN n'y est écrit, et l'IP de ta box y est masquée comme à l'écran. Au-delà d'1 Mo, le journal est archivé en `aria.log.1` au lancement suivant et repart de zéro.
 
 ### Limites à connaître
 
@@ -160,12 +164,14 @@ src/
 ├── shieldservice.go            # méthodes appelées par l'interface
 ├── startup.go                  # démarrage avec Windows, reprise de la protection, quitter
 ├── adblock.go                  # blocage des pubs : activation, mise à jour, exceptions
+├── journal.go                  # aria.log : résultat de chaque action
 ├── notify.go                   # notifications Windows (incidents, sortie)
 ├── internal/
 │   ├── dnsengine/              # Unbound embarqué : extraction, lancement, tests
 │   ├── sysdns/                 # bascule et restauration du DNS de Windows
 │   ├── paths/                  # emplacements des données, verrouillage, migration
 │   ├── prefs/                  # réglages et dernière protection (reglages.json)
+│   ├── journal/                # écriture du journal, sans jamais suivre un lien
 │   ├── blocklist/              # liste de blocage : téléchargement, filtre, règles Unbound
 │   ├── autostart/              # tâche planifiée et copie protégée dans Program Files
 │   ├── toastreg/               # nettoyage du registre des notifications
