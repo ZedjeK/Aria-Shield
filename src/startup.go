@@ -147,21 +147,23 @@ func (s *ShieldService) resume() {
 	if !p.Resume || p.Last == prefs.None || !sysx.IsAdmin() {
 		return
 	}
-	what := "le DNS"
+	// what : complément direct (« réactiver le DNS ») ; of : après « de »
+	// (« réactivation du DNS »).
+	what, of := "le DNS", "du DNS"
 	if p.Last == prefs.Discret {
-		what = "le mode Discret"
+		what, of = "le mode Discret", "du mode Discret"
 	}
 	stop := s.beginResume()
 	defer s.endResume(stop)
 
 	deadline := time.Now().Add(resumeWindow)
 	for attempt := 1; ; attempt++ {
-		s.setResuming(fmt.Sprintf("Réactivation de %s (essai %d)…", what, attempt))
+		s.setResuming(fmt.Sprintf("Réactivation %s (essai %d)…", of, attempt))
 		msg := s.resumeOnce(p.Last)
 		if msg == "" {
-			s.logf("réactivation de %s : réussie (essai %d)", what, attempt)
+			s.logf("réactivation %s : réussie (essai %d)", of, attempt)
 		} else {
-			s.logf("réactivation de %s : essai %d en échec : %s", what, attempt, msg)
+			s.logf("réactivation %s : essai %d en échec : %s", of, attempt, msg)
 		}
 		select {
 		case <-stop:

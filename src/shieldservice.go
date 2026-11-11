@@ -79,6 +79,8 @@ type ShieldService struct {
 	quitting   atomic.Bool   // Aria est en train de quitter
 
 	log  *journal.Journal // aria.log (journal.go)
+	// silent : lancée sans fenêtre par la tâche planifiée (posé par main).
+	silent bool
 
 	updMu  sync.Mutex  // protège update
 	update UpdateState // dernière vérification des versions (update.go)
@@ -256,6 +258,9 @@ type SystemTests struct {
 // répare ; puis, en arrière-plan, la dernière protection est réactivée et la
 // copie lancée au démarrage de Windows remise à jour (startup.go).
 func (s *ShieldService) ServiceStartup(ctx context.Context, options application.ServiceOptions) error {
+	// Noté ici et non dans main : un exe relancé alors qu'Aria tourne déjà
+	// s'efface avant d'arriver jusqu'ici, et n'écrit donc pas « démarre ».
+	s.logStart(s.silent)
 	if recovered, steps := s.sys.RecoverLeftover(); recovered {
 		s.logResult("DNS laissé sur Aria par une session interrompue : restauration", steps, "")
 	}
