@@ -108,3 +108,13 @@ func TestEmbeddedUnbound(t *testing.T) {
 		t.Fatal("clé racine KSK-2024 absente")
 	}
 }
+
+func TestIncludeLine(t *testing.T) {
+	if includeLine("") != "" {
+		t.Fatal("ligne include sans fichier")
+	}
+	got := includeLine(`C:\ProgramData\AriaShield\blocage.conf`)
+	if !strings.Contains(got, "\ninclude: \"C:/ProgramData/AriaShield/blocage.conf\"\n") {
+		t.Fatalf("ligne include inattendue : %q", got)
+	}
+}

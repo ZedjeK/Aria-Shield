@@ -36,6 +36,8 @@ Ton FAI voit chaque site que tu visites (par le DNS), peut en bloquer certains, 
 
 **Plusieurs profils VPN** (jusqu'à 20) : importe le fichier `.conf` de ton fournisseur en un clic et change de pays avec « basculer », sans couper la protection.
 
+**Blocage des pubs et des traceurs** (en option, page Résolveur DNS) : le résolveur répond `0.0.0.0` pour les domaines de la liste [OISD small](https://oisd.nl), pour tout Windows et pas seulement le navigateur. Aria télécharge la liste, n'en garde que des noms de domaine valides et écrit elle-même les règles : une liste piégée ne peut rien rediriger, seulement bloquer. Un site ne marche plus ? Ajoute son domaine aux exceptions.
+
 **Toujours active si tu le veux** : fermer la fenêtre range Aria dans la zone de notification, sans rien couper. Dans « réglages », active « Démarrer avec Windows » : Aria se lance à l'ouverture de ta session, sans fenêtre UAC, et réactive ta dernière protection (DNS seul ou mode Discret).
 
 Une page **Tests** vérifie ce qu'Aria annonce : Windows passe bien par le résolveur, aucune fuite d'IP en IPv4 ou IPv6, kill switch actif, et navigateurs dont le « DNS sécurisé » contournerait Aria.
@@ -67,7 +69,7 @@ Aria ne dépose rien à côté de l'exe. Tout va dans deux dossiers :
 | Dossier | Contenu | Accès |
 | --- | --- | --- |
 | `%USERPROFILE%\.Aria-Shield` | Tes données : profils VPN chiffrés, Tor Browser et ses favoris, cache de l'interface (`webview`) | Ton compte |
-| `%PROGRAMDATA%\AriaShield` | Ce qu'Aria exécute en administrateur (Unbound) et la photo de ton DNS d'origine | Administrateurs et système uniquement |
+| `%PROGRAMDATA%\AriaShield` | Ce qu'Aria exécute en administrateur (Unbound), la photo de ton DNS d'origine et la liste de blocage des pubs | Administrateurs et système uniquement |
 
 Le second est créé déjà verrouillé, pour qu'aucun programme sans droits admin ne puisse y glisser un faux exécutable ou une DLL qu'Aria lancerait ensuite. S'il existe déjà sans avoir été créé par Aria (propriétaire inattendu, ou lien vers un autre dossier), il est mis de côté sous le nom `AriaShield.suspect-<date>` et remplacé par un dossier neuf ; Aria te prévient au lancement. Si le verrouillage échoue, Aria refuse de lancer Unbound.
 
@@ -105,6 +107,9 @@ Pour revenir à la normale à tout moment : « restaurer --tout », en bas de la
 - **Tor Browser jamais en administrateur** : Aria tourne en admin, mais installe, met à jour et lance Tor Browser avec tes droits normaux. L'installation et les mises à jour passent par un assistant (le même exe, relancé sans élévation) : Aria ne fait que lire le dossier de Tor Browser, si bien qu'un programme sans droits ne peut pas s'en servir pour faire écrire Aria ailleurs sur le disque.
 
 ### Limites à connaître
+
+- Le blocage des pubs agit sur les noms de domaine : les pubs servies depuis le domaine du site lui-même (YouTube, par exemple) passent, et un navigateur dont le « DNS sécurisé » est activé contourne Aria (la page Tests le signale). Dans le navigateur, un bloqueur comme uBlock Origin reste plus efficace ; les deux se complètent.
+- La liste OISD est téléchargée sur ta machine à l'activation, puis chaque semaine au lancement, sans signature : c'est pour cela qu'Aria la filtre. Elle n'est pas embarquée dans l'exe (elle est sous licence GPLv3, Aria sous MIT). Avec la liste, Unbound prend une quinzaine de Mo de mémoire en plus.
 
 - L'exe n'est pas signé (Authenticode) : vérifie son empreinte ou son attestation (voir « Vérifier l'exe »).
 - Le mode Fantôme rend anonyme ce que tu fais **dans Tor Browser**, pas le reste du PC.
@@ -154,12 +159,14 @@ src/
 ├── main.go                     # appli Wails, fenêtre, zone de notification
 ├── shieldservice.go            # méthodes appelées par l'interface
 ├── startup.go                  # démarrage avec Windows, reprise de la protection, quitter
+├── adblock.go                  # blocage des pubs : activation, mise à jour, exceptions
 ├── notify.go                   # notifications Windows (incidents, sortie)
 ├── internal/
 │   ├── dnsengine/              # Unbound embarqué : extraction, lancement, tests
 │   ├── sysdns/                 # bascule et restauration du DNS de Windows
 │   ├── paths/                  # emplacements des données, verrouillage, migration
 │   ├── prefs/                  # réglages et dernière protection (reglages.json)
+│   ├── blocklist/              # liste de blocage : téléchargement, filtre, règles Unbound
 │   ├── autostart/              # tâche planifiée et copie protégée dans Program Files
 │   ├── toastreg/               # nettoyage du registre des notifications
 │   ├── vpn/                    # profils chiffrés, import .conf, tunnel WireGuardNT

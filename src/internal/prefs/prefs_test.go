@@ -64,3 +64,19 @@ func TestOversizedOrBrokenFile(t *testing.T) {
 		t.Fatalf("fichier cassé pris en compte : %+v", p)
 	}
 }
+
+func TestAllowListCapped(t *testing.T) {
+	dir := t.TempDir()
+	s := New(dir)
+	many := make([]string, maxAllow+50)
+	for i := range many {
+		many[i] = "exemple.fr"
+	}
+	if err := s.Update(func(p *Prefs) { p.BlockAds = true; p.Allow = many }); err != nil {
+		t.Fatal(err)
+	}
+	p := New(dir).Load()
+	if !p.BlockAds || len(p.Allow) != maxAllow {
+		t.Fatalf("relu : blocage=%v, %d exceptions", p.BlockAds, len(p.Allow))
+	}
+}
