@@ -109,16 +109,14 @@ func main() {
 		go svc.notify.trayHint() // « Aria continue en arrière-plan »
 	})
 
-	// Icône de la zone de notification (celle de l'exe) : clic gauche pour
-	// ouvrir, clic droit pour le menu.
-	menu := application.NewMenu()
-	menu.Add("Ouvrir Aria Shield").OnClick(func(*application.Context) { showWindow() })
-	menu.AddSeparator()
-	menu.Add("Quitter (rétablit ta connexion d'origine)").OnClick(func(*application.Context) { go svc.quit() })
+	// Icône de la zone de notification : clic gauche pour ouvrir, clic droit
+	// pour le menu. Son dessin, son infobulle et son menu suivent l'état de la
+	// protection (tray.go).
 	tray := app.SystemTray.New()
-	tray.SetTooltip("Aria Shield")
-	tray.SetMenu(menu)
 	tray.OnClick(showWindow)
+	ui := &trayUI{svc: svc, tray: tray, show: showWindow}
+	ui.refresh()
+	go ui.watch()
 
 	if err := app.Run(); err != nil {
 		log.Fatal(err)
