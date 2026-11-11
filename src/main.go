@@ -45,7 +45,7 @@ func main() {
 	silent := slices.Contains(os.Args[1:], autostart.SilentArg)
 
 	svc := NewShieldService()
-	svc.logStart(silent)
+	svc.silent = silent
 	svc.notify = newNotifier(svc.prefs)
 	var window *application.WebviewWindow
 	showWindow := func() {
