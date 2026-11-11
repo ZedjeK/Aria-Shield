@@ -6,7 +6,7 @@
   import Switch from '../lib/Switch.svelte'
   import {
     app, startDNS, stopDNS, testDNS, enableSystemDNS, disableSystemDNS, blockedReason, chip, loadAdapters,
-    ads, loadAds, setAdBlock, updateBlocklist, addAllow, removeAllow, pauseAdBlock, resumeAdBlock,
+    ads, loadAds, setAdBlock, updateBlocklist, addAllow, removeAllow, pauseAdBlock, resumeAdBlock, setBlocklist,
   } from '../lib/state.svelte.js'
 
   const running = $derived(app.status?.dnsRunning ?? false)
@@ -165,8 +165,22 @@
       <p class="error" role="alert">{ads.error}</p>
     {/if}
     <p class="card-text">
-      Aria télécharge la liste {ad?.source ?? 'OISD small'}, n'en garde que des noms de domaine valides et écrit elle-même les règles : une liste piégée ne peut rien rediriger, seulement bloquer. Activer, couper ou mettre à jour redémarre le résolveur (une à deux secondes sans résolution). Les pubs servies depuis le domaine du site lui-même ne sont pas bloquées.
+      Aria télécharge la liste choisie, n'en garde que des noms de domaine valides et écrit elle-même les règles : une liste piégée ne peut rien rediriger, seulement bloquer. Activer, couper ou mettre à jour redémarre le résolveur (une à deux secondes sans résolution). Les pubs servies depuis le domaine du site lui-même ne sont pas bloquées.
     </p>
+    <div class="lists" role="group" aria-label="Liste de blocage">
+      {#each ad?.sources ?? [] as src (src.id)}
+        <button
+          class="list"
+          class:selected={ad.choice === src.id}
+          aria-pressed={ad.choice === src.id}
+          disabled={app.busy || Boolean(reason)}
+          onclick={() => ad.choice !== src.id && setBlocklist(src.id)}
+        >
+          <span class="list-name">{src.name}</span>
+          <span class="list-note">{src.note}</span>
+        </button>
+      {/each}
+    </div>
     <div class="actions">
       <button class="btn-ghost" onclick={updateBlocklist} disabled={!ad || app.busy || Boolean(reason)}>
         {app.busy ? 'En cours…' : 'mettre à jour la liste'}
@@ -178,7 +192,7 @@
       {/if}
     </div>
     {#if listDate}
-      <p class="hint">Liste du {listDate} · mise à jour automatique chaque semaine, au lancement d'Aria.</p>
+      <p class="hint">{ad?.list?.source} du {listDate} · mise à jour automatique chaque semaine, au lancement d'Aria.</p>
     {/if}
 
     <div class="allow">
@@ -245,6 +259,52 @@
   .mono {
     font-family: var(--font-mono);
     font-size: 11px;
+  }
+  .lists {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+  @container (min-width: 600px) {
+    .lists {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  .list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 12px;
+    min-height: 44px;
+    border: 1.5px solid var(--line-strong);
+    border-radius: 10px 0;
+    corner-shape: bevel;
+    background: transparent;
+    color: var(--text);
+    font-family: var(--font-mono);
+    text-align: left;
+  }
+  .list:hover:not(.selected):not(:disabled) {
+    background: var(--hover);
+  }
+  .list.selected {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 10%, transparent);
+  }
+  .list:disabled {
+    opacity: 0.45;
+  }
+  .list-name {
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .list.selected .list-name {
+    color: var(--accent);
+  }
+  .list-note {
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--faint);
   }
   .allow {
     display: flex;
