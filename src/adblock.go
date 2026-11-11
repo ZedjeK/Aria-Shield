@@ -35,8 +35,9 @@ type AdBlock struct {
 	Allow   []string       `json:"allow"`
 	// PausedUntil : fin de la suspension en cours (heure locale « 15:04 »), "" sinon.
 	PausedUntil string `json:"pausedUntil"`
-	Source      string `json:"source"`
-	URL     string         `json:"url"`
+	// Choice : liste choisie ; Sources : celles proposées.
+	Choice  string             `json:"choice"`
+	Sources []blocklist.Source `json:"sources"`
 }
 
 // AdBlock renvoie l'état du blocage.
@@ -52,8 +53,8 @@ func (s *ShieldService) AdBlock() AdBlock {
 		List:    s.ads.Info(),
 		Allow:   allow,
 		PausedUntil: s.adPausedUntil(),
-		Source:  blocklist.SourceName,
-		URL:     blocklist.SourceURL,
+		Choice:  blocklist.SourceByID(p.List).ID,
+		Sources: blocklist.Sources,
 	}
 }
 
@@ -73,11 +74,11 @@ func (s *ShieldService) doSetAdBlock(on bool) SystemResult {
 		res.Steps = append(res.Steps, Step{Label: label, OK: ok, Note: note})
 	}
 
-	if on && s.ads.Stale() {
-		info, err := s.ads.Update(context.Background(), s.prefs.Load().Allow)
+	if on && s.ads.Stale(s.prefs.Load().List) {
+		info, err := s.ads.Update(context.Background(), s.prefs.Load().List, s.prefs.Load().Allow)
 		switch {
 		case err == nil:
-			add("Liste "+blocklist.SourceName+" téléchargée et filtrée", true, countNote(info))
+			add("Liste "+info.Source+" téléchargée et filtrée", true, countNote(info))
 		case info.Present:
 			add("Mise à jour de la liste", false, err.Error()+" : la liste déjà installée est gardée")
 		default:
@@ -109,13 +110,13 @@ func (s *ShieldService) doUpdateBlocklist() SystemResult {
 		res.Steps = append(res.Steps, Step{Label: label, OK: ok, Note: note})
 	}
 	p := s.prefs.Load()
-	info, err := s.ads.Update(context.Background(), p.Allow)
+	info, err := s.ads.Update(context.Background(), p.List, p.Allow)
 	if err != nil {
 		add("Mise à jour de la liste", false, err.Error())
 		res.Error = err.Error()
 		return res
 	}
-	add("Liste "+blocklist.SourceName+" téléchargée et filtrée", true, countNote(info))
+	add("Liste "+info.Source+" téléchargée et filtrée", true, countNote(info))
 	s.applyBlocklist(p.BlockAds, add, &res)
 	return res
 }
@@ -216,6 +217,40 @@ func (s *ShieldService) applyBlocklist(on bool, add func(string, bool, string), 
 	s.alert("DNS d'origine remis", "Le résolveur Unbound n'a pas redémarré après le changement de liste de blocage.")
 }
 
+// SetBlocklist choisit la liste (« small » ou « big »). Si le blocage est
+// activé, la nouvelle liste est téléchargée et appliquée tout de suite ; en cas
+// d'échec, l'ancienne liste et l'ancien choix restent en place.
+func (s *ShieldService) SetBlocklist(id string) SystemResult {
+	s.adMu.Lock()
+	defer s.adMu.Unlock()
+	var res SystemResult
+	add := func(label string, ok bool, note string) {
+		res.Steps = append(res.Steps, Step{Label: label, OK: ok, Note: note})
+	}
+	src := blocklist.SourceByID(id)
+	p := s.prefs.Load()
+	if p.BlockAds {
+		info, err := s.ads.Update(context.Background(), src.ID, p.Allow)
+		if err != nil {
+			add("Téléchargement de la liste "+src.Name, false, err.Error())
+			res.Error = "liste inchangée : " + err.Error()
+			s.logResult("Choix de la liste de blocage", res.Steps, res.Error)
+			return res
+		}
+		add("Liste "+info.Source+" téléchargée et filtrée", true, countNote(info))
+	}
+	if err := s.prefs.Update(func(p *prefs.Prefs) { p.List = src.ID }); err != nil {
+		res.Error = "réglage non enregistré : " + err.Error()
+		return res
+	}
+	add("Liste choisie : "+src.Name, true, "")
+	if p.BlockAds {
+		s.applyBlocklist(true, add, &res)
+	}
+	s.logResult("Choix de la liste de blocage", res.Steps, res.Error)
+	return res
+}
+
 // ---------- Suspension ----------
 
 // PauseAdBlock suspend le blocage pendant quelques minutes (un site casse, un
@@ -314,10 +349,10 @@ func (s *ShieldService) refreshBlocklist() {
 	s.adMu.Lock()
 	defer s.adMu.Unlock()
 	p := s.prefs.Load()
-	if !p.BlockAds || !s.ads.Stale() {
+	if !p.BlockAds || !s.ads.Stale(p.List) {
 		return
 	}
-	info, err := s.ads.Update(context.Background(), p.Allow)
+	info, err := s.ads.Update(context.Background(), p.List, p.Allow)
 	if err != nil {
 		s.logf("mise à jour hebdomadaire de la liste de blocage : échec : %v", err)
 		return
@@ -326,7 +361,7 @@ func (s *ShieldService) refreshBlocklist() {
 	add := func(label string, ok bool, note string) {
 		res.Steps = append(res.Steps, Step{Label: label, OK: ok, Note: note})
 	}
-	add("Liste "+blocklist.SourceName+" téléchargée et filtrée", true, countNote(info))
+	add("Liste "+info.Source+" téléchargée et filtrée", true, countNote(info))
 	s.applyBlocklist(true, add, &res)
 	s.logResult("Mise à jour hebdomadaire de la liste de blocage", res.Steps, res.Error)
 }

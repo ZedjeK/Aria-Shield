@@ -44,6 +44,8 @@ type Prefs struct {
 	CheckUpdates bool `json:"verifier-versions"`
 	// BlockAds : blocage des pubs et des traceurs par le résolveur.
 	BlockAds bool `json:"blocage-pubs"`
+	// List : liste de blocage choisie (« small » ou « big » ; autre valeur : small).
+	List string `json:"liste-blocage,omitempty"`
 	// Allow : domaines que l'utilisateur ne veut pas voir bloqués. Revalidés
 	// par le paquet blocklist avant tout usage.
 	Allow []string `json:"exceptions,omitempty"`

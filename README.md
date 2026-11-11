@@ -36,7 +36,7 @@ Ton FAI voit chaque site que tu visites (par le DNS), peut en bloquer certains, 
 
 **Plusieurs profils VPN** (jusqu'à 20) : importe le fichier `.conf` de ton fournisseur en un clic et change de pays avec « basculer », sans couper la protection.
 
-**Blocage des pubs et des traceurs** (en option, page Résolveur DNS) : le résolveur répond `0.0.0.0` pour les domaines de la liste [OISD small](https://oisd.nl), pour tout Windows et pas seulement le navigateur. Aria télécharge la liste, n'en garde que des noms de domaine valides et écrit elle-même les règles : une liste piégée ne peut rien rediriger, seulement bloquer. Un site ne marche plus ? Suspends le blocage dix minutes (il reprend tout seul), ou ajoute son domaine aux exceptions.
+**Blocage des pubs et des traceurs** (en option, page Résolveur DNS) : le résolveur répond `0.0.0.0` pour les domaines de la liste [OISD](https://oisd.nl) choisie (« small », environ 60 000 domaines, ou « big », environ 225 000, qui bloque plus large et casse plus de sites), pour tout Windows et pas seulement le navigateur. Aria télécharge la liste, n'en garde que des noms de domaine valides et écrit elle-même les règles : une liste piégée ne peut rien rediriger, seulement bloquer. Un site ne marche plus ? Suspends le blocage dix minutes (il reprend tout seul), ou ajoute son domaine aux exceptions.
 
 **Versions** : Aria signale quand une version plus récente est publiée (une requête à GitHub quelques minutes après le lancement, désactivable dans les réglages ; rien n'est téléchargé ni installé). Et si tu lances un exe d'une autre version pendant qu'Aria tourne, elle te le dit au lieu de rouvrir l'ancienne fenêtre.
 
@@ -115,7 +115,7 @@ Aria note ce qu'elle fait dans `%USERPROFILE%\.Aria-Shield\aria.log` : chaque ac
 ### Limites à connaître
 
 - Le blocage des pubs agit sur les noms de domaine : les pubs servies depuis le domaine du site lui-même (YouTube, par exemple) passent, et un navigateur dont le « DNS sécurisé » est activé contourne Aria (la page Tests le signale). Dans le navigateur, un bloqueur comme uBlock Origin reste plus efficace ; les deux se complètent.
-- La liste OISD est téléchargée sur ta machine à l'activation, puis chaque semaine au lancement, sans signature : c'est pour cela qu'Aria la filtre. Elle n'est pas embarquée dans l'exe (elle est sous licence GPLv3, Aria sous MIT). Avec la liste, Unbound prend une quinzaine de Mo de mémoire en plus.
+- La liste OISD est téléchargée sur ta machine à l'activation, puis chaque semaine au lancement, sans signature : c'est pour cela qu'Aria la filtre. Elle n'est pas embarquée dans l'exe (elle est sous licence GPLv3, Aria sous MIT). Avec la liste, Unbound prend une quinzaine de Mo de mémoire en plus (« small ») ou environ 70 (« big »).
 
 - L'exe n'est pas signé (Authenticode) : vérifie son empreinte ou son attestation (voir « Vérifier l'exe »).
 - Le mode Fantôme rend anonyme ce que tu fais **dans Tor Browser**, pas le reste du PC.

@@ -13,11 +13,9 @@ import (
 )
 
 const (
-	// SourceName et SourceURL : la liste utilisée. « small » vise la pub et les
-	// traceurs avec peu de faux positifs. Format « domainswild2 » : un domaine
-	// par ligne, sous-domaines compris.
-	SourceName = "OISD small"
-	SourceURL  = "https://small.oisd.nl/domainswild2"
+	// Small et Big : les deux listes proposées (voir Sources).
+	Small = "small"
+	Big   = "big"
 
 	confName = "blocage.conf" // règles lues par Unbound
 	listName = "blocage.txt"  // domaines retenus, pour régénérer sans retélécharger
@@ -29,12 +27,41 @@ const (
 	MaxAge = 7 * 24 * time.Hour
 )
 
+// Source décrit une liste proposée. Format « domainswild2 » : un domaine par
+// ligne, sous-domaines compris.
+type Source struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	URL  string `json:"url"`
+	Note string `json:"note"`
+}
+
+// Sources : les listes OISD. Les adresses sont fixées ici : l'utilisateur
+// choisit entre elles, il ne peut pas en saisir une autre.
+var Sources = []Source{
+	{Small, "OISD small", "https://small.oisd.nl/domainswild2",
+		"Pubs et traceurs, peu de faux positifs. Environ 60 000 domaines, 15 Mo de mémoire en plus."},
+	{Big, "OISD big", "https://big.oisd.nl/domainswild2",
+		"Bloque plus large (pubs, traceurs, hameçonnage, logiciels malveillants). Environ 225 000 domaines, 70 Mo de mémoire en plus, et plus de sites qui cassent."},
+}
+
+// SourceByID renvoie la liste demandée, ou « small » si l'identifiant est inconnu.
+func SourceByID(id string) Source {
+	for _, s := range Sources {
+		if s.ID == id {
+			return s
+		}
+	}
+	return Sources[0]
+}
+
 // Info décrit la liste installée.
 type Info struct {
 	Present bool      `json:"present"`
 	Count   int       `json:"count"`   // domaines bloqués, exceptions déduites
 	Updated time.Time `json:"updated"` // dernier téléchargement réussi
-	Source  string    `json:"source"`
+	Source  string    `json:"source"`   // nom affiché
+	ID      string    `json:"sourceId"` // Small ou Big
 }
 
 // Store range la liste dans le dossier système verrouillé : Unbound, lancé en
@@ -44,7 +71,7 @@ type Store struct {
 	mu  sync.Mutex
 	dir string
 	// fetch télécharge la liste brute (remplacé dans les tests).
-	fetch func(ctx context.Context) (io.ReadCloser, error)
+	fetch func(ctx context.Context, url string) (io.ReadCloser, error)
 }
 
 // NewStore prépare le rangement dans dir ("" : dossier non verrouillé, tout échoue).
@@ -90,21 +117,23 @@ func (s *Store) infoLocked() Info {
 	return info
 }
 
-// Stale indique si la liste est absente ou vieille de plus de MaxAge.
-func (s *Store) Stale() bool {
+// Stale indique si la liste installée est absente, vieille de plus de MaxAge,
+// ou n'est pas celle demandée (id).
+func (s *Store) Stale(id string) bool {
 	info := s.Info()
-	return !info.Present || time.Since(info.Updated) > MaxAge
+	return !info.Present || time.Since(info.Updated) > MaxAge || info.ID != SourceByID(id).ID
 }
 
 // Update télécharge la liste, n'en garde que les domaines valides et réécrit
 // les fichiers. En cas d'échec, la liste déjà installée reste en place.
-func (s *Store) Update(ctx context.Context, allow []string) (Info, error) {
+func (s *Store) Update(ctx context.Context, id string, allow []string) (Info, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.dir == "" {
 		return Info{}, fmt.Errorf("dossier système non verrouillé : la liste n'est pas installée")
 	}
-	body, err := s.fetch(ctx)
+	src := SourceByID(id)
+	body, err := s.fetch(ctx, src.URL)
 	if err != nil {
 		return s.infoLocked(), fmt.Errorf("téléchargement de la liste : %w", err)
 	}
@@ -113,7 +142,7 @@ func (s *Store) Update(ctx context.Context, allow []string) (Info, error) {
 	if err != nil {
 		return s.infoLocked(), err
 	}
-	return s.writeLocked(domains, allow, time.Now())
+	return s.writeLocked(domains, allow, time.Now(), src)
 }
 
 // Rebuild régénère les règles à partir de la liste déjà téléchargée, après un
@@ -134,19 +163,20 @@ func (s *Store) Rebuild(allow []string) (Info, error) {
 	if err != nil {
 		return s.infoLocked(), err
 	}
-	return s.writeLocked(domains, allow, s.infoLocked().Updated)
+	old := s.infoLocked()
+	return s.writeLocked(domains, allow, old.Updated, SourceByID(old.ID))
 }
 
 // writeLocked écrit la liste retenue, les règles puis la fiche, chacune par
 // fichier temporaire puis renommage : jamais de fichier à moitié écrit.
-func (s *Store) writeLocked(domains, allow []string, updated time.Time) (Info, error) {
+func (s *Store) writeLocked(domains, allow []string, updated time.Time, src Source) (Info, error) {
 	conf, n := Render(domains, allow)
 	list := []byte{}
 	for _, d := range domains {
 		list = append(list, d...)
 		list = append(list, '\n')
 	}
-	info := Info{Present: true, Count: n, Updated: updated, Source: SourceName}
+	info := Info{Present: true, Count: n, Updated: updated, Source: src.Name, ID: src.ID}
 	meta, err := json.MarshalIndent(info, "", "  ")
 	if err != nil {
 		return s.infoLocked(), err
@@ -185,7 +215,7 @@ func writeAtomic(path string, data []byte) error {
 }
 
 // download récupère la liste en HTTPS. Les redirections restent sur HTTPS.
-func download(ctx context.Context) (io.ReadCloser, error) {
+func download(ctx context.Context, url string) (io.ReadCloser, error) {
 	client := &http.Client{
 		Timeout: 90 * time.Second,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
@@ -195,7 +225,7 @@ func download(ctx context.Context) (io.ReadCloser, error) {
 			return nil
 		},
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, SourceURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}

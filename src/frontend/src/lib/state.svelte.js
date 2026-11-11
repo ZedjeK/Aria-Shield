@@ -375,7 +375,7 @@ export async function setUpdateCheck(on) {
 
 /** État du blocage des pubs (page Résolveur DNS). */
 export const ads = $state({
-  data: null, // { enabled, active, list: { present, count, updated }, allow, source, url }
+  data: null, // { enabled, active, list: { present, count, updated, source }, allow, choice, sources, pausedUntil }
   error: '',
 })
 
@@ -407,6 +407,12 @@ export async function addAllow(domain) {
   const res = await run('Exception au blocage', () => ShieldService.AddAllow(domain))
   await loadAds()
   return Boolean(res && !res.error)
+}
+
+/** Choisit la liste de blocage (« small » ou « big »). */
+export async function setBlocklist(id) {
+  await run('Choix de la liste de blocage', () => ShieldService.SetBlocklist(id))
+  await loadAds()
 }
 
 /** Suspend le blocage quelques minutes ; il reprend tout seul. */

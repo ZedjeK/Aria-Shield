@@ -122,7 +122,7 @@ func TestRender(t *testing.T) {
 func storeWith(t *testing.T, body string, err error) *Store {
 	t.Helper()
 	s := NewStore(t.TempDir())
-	s.fetch = func(context.Context) (io.ReadCloser, error) {
+	s.fetch = func(context.Context, string) (io.ReadCloser, error) {
 		if err != nil {
 			return nil, err
 		}
@@ -133,18 +133,22 @@ func storeWith(t *testing.T, body string, err error) *Store {
 
 func TestStoreUpdateAndRebuild(t *testing.T) {
 	s := storeWith(t, fakeList(MinDomains+5), nil)
-	if s.ConfPath() != "" || !s.Stale() {
+	if s.ConfPath() != "" || !s.Stale(Small) {
 		t.Fatal("liste annoncée présente avant tout téléchargement")
 	}
-	info, err := s.Update(context.Background(), nil)
+	info, err := s.Update(context.Background(), Small, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !info.Present || info.Count != MinDomains+5 || info.Source != SourceName {
+	if !info.Present || info.Count != MinDomains+5 || info.Source != "OISD small" || info.ID != Small {
 		t.Fatalf("fiche inattendue : %+v", info)
 	}
-	if s.ConfPath() == "" || s.Stale() {
+	if s.ConfPath() == "" || s.Stale(Small) {
 		t.Fatal("liste absente ou périmée juste après le téléchargement")
+	}
+	// Changer de liste rend l'installée périmée ; un identifiant inconnu vaut small.
+	if !s.Stale(Big) || s.Stale("inconnue") {
+		t.Fatal("changement de liste mal détecté")
 	}
 	// Une exception retire un domaine sans retélécharger, et garde la date.
 	again, err := s.Rebuild([]string{"pub3.exemple-pub.net"})
@@ -166,19 +170,19 @@ func TestStoreUpdateAndRebuild(t *testing.T) {
 
 func TestStoreKeepsOldListOnFailure(t *testing.T) {
 	s := storeWith(t, fakeList(MinDomains), nil)
-	if _, err := s.Update(context.Background(), nil); err != nil {
+	if _, err := s.Update(context.Background(), Small, nil); err != nil {
 		t.Fatal(err)
 	}
 	before, _ := os.ReadFile(filepath.Join(s.dir, confName))
 
-	s.fetch = func(context.Context) (io.ReadCloser, error) { return nil, errors.New("réseau coupé") }
-	if _, err := s.Update(context.Background(), nil); err == nil {
+	s.fetch = func(context.Context, string) (io.ReadCloser, error) { return nil, errors.New("réseau coupé") }
+	if _, err := s.Update(context.Background(), Small, nil); err == nil {
 		t.Fatal("échec de téléchargement non signalé")
 	}
-	s.fetch = func(context.Context) (io.ReadCloser, error) {
+	s.fetch = func(context.Context, string) (io.ReadCloser, error) {
 		return io.NopCloser(strings.NewReader("<html>503</html>")), nil
 	}
-	if _, err := s.Update(context.Background(), nil); err == nil {
+	if _, err := s.Update(context.Background(), Small, nil); err == nil {
 		t.Fatal("page d'erreur acceptée comme liste")
 	}
 	after, _ := os.ReadFile(filepath.Join(s.dir, confName))
@@ -189,10 +193,34 @@ func TestStoreKeepsOldListOnFailure(t *testing.T) {
 
 func TestStoreWithoutLockedDir(t *testing.T) {
 	s := NewStore("")
-	if _, err := s.Update(context.Background(), nil); err == nil {
+	if _, err := s.Update(context.Background(), Small, nil); err == nil {
 		t.Fatal("installation acceptée sans dossier verrouillé")
 	}
 	if s.ConfPath() != "" || s.Info().Present {
 		t.Fatal("liste annoncée présente sans dossier")
+	}
+}
+
+func TestUpdateUsesChosenSource(t *testing.T) {
+	s := NewStore(t.TempDir())
+	var asked string
+	s.fetch = func(_ context.Context, url string) (io.ReadCloser, error) {
+		asked = url
+		return io.NopCloser(strings.NewReader(fakeList(MinDomains))), nil
+	}
+	info, err := s.Update(context.Background(), Big, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if asked != SourceByID(Big).URL || info.ID != Big || info.Source != "OISD big" {
+		t.Fatalf("liste demandée : %s ; fiche : %+v", asked, info)
+	}
+	// Une exception ne change pas de liste.
+	if again, err := s.Rebuild([]string{"pub1.exemple-pub.net"}); err != nil || again.ID != Big {
+		t.Fatalf("après exception : %+v, %v", again, err)
+	}
+	// Un identifiant inconnu retombe sur small, jamais sur une adresse libre.
+	if _, err := s.Update(context.Background(), "https://evil.example/liste", nil); err != nil || asked != SourceByID(Small).URL {
+		t.Fatalf("identifiant inconnu : adresse demandée %s, %v", asked, err)
 	}
 }
