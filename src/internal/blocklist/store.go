@@ -128,8 +128,9 @@ func (s *Store) Rebuild(allow []string) (Info, error) {
 	if err != nil {
 		return s.infoLocked(), ErrEmpty
 	}
-	defer f.Close()
 	domains, err := Parse(io.LimitReader(f, maxDownload))
+	// Fermé avant de réécrire : Windows refuse de remplacer un fichier ouvert.
+	f.Close()
 	if err != nil {
 		return s.infoLocked(), err
 	}
