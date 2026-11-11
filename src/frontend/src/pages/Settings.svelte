@@ -4,9 +4,16 @@
   // fenêtre range Aria dans la zone de notification ; seul « Quitter » l'arrête.
   import { onMount } from 'svelte'
   import Switch from '../lib/Switch.svelte'
-  import { app, settings, loadSettings, setAutostart, setResume, setNotifications, quitApp } from '../lib/state.svelte.js'
+  import {
+    app, settings, loadSettings, setAutostart, setResume, setNotifications, quitApp,
+    update, loadUpdate, checkUpdate, setUpdateCheck,
+  } from '../lib/state.svelte.js'
 
-  onMount(loadSettings)
+  onMount(() => {
+    loadSettings()
+    loadUpdate()
+  })
+  const up = $derived(update.data)
 
   const d = $derived(settings.data)
   const lastLabel = { aucune: 'aucune', dns: 'DNS (résolveur pour tout Windows)', discret: 'mode Discret (VPN + DNS)' }
@@ -94,6 +101,40 @@
     </section>
   </div>
 
+  <!-- Nouvelles versions -->
+  <section class="card">
+    <h2>Version</h2>
+    <div class="row">
+      <span class="row-text">
+        <span class="row-name">Vérifier les nouvelles versions</span>
+        <span class="row-detail">Quelques minutes après le lancement, une requête à GitHub · rien n'est téléchargé ni installé</span>
+      </span>
+      <Switch
+        checked={up?.enabled ?? false}
+        disabled={!up}
+        label="Vérifier les nouvelles versions au lancement"
+        onchange={setUpdateCheck}
+      />
+    </div>
+    <div class="actions">
+      <button class="btn-ghost" onclick={checkUpdate} disabled={update.busy}>
+        {update.busy ? 'vérification…' : 'vérifier maintenant'}
+      </button>
+    </div>
+    {#if up?.error}
+      <p class="error" role="alert">{up.error}</p>
+    {:else if up?.available}
+      <p class="card-text">
+        La version <strong>{up.latest}</strong> est disponible (tu as la {up.current}). Quitte Aria, puis télécharge le nouvel exe :
+      </p>
+      <p class="path selectable">{up.url}</p>
+    {:else if up?.checked}
+      <p class="hint">À jour : la {up.current} est la dernière version publiée.</p>
+    {:else}
+      <p class="hint">Version installée : {up?.current ?? app.status?.version ?? '…'}.</p>
+    {/if}
+  </section>
+
   {#if app.logTitle && (app.log.length || app.actionError)}
     <section class="card">
       <h2>{app.logTitle}</h2>
@@ -115,6 +156,11 @@
 </div>
 
 <style>
+  .selectable {
+    user-select: text;
+    font-size: 12px;
+    color: var(--accent);
+  }
   .quit:hover:not(:disabled) {
     border-color: var(--action);
     color: var(--action);

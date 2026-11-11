@@ -79,6 +79,10 @@ type ShieldService struct {
 	quitting   atomic.Bool   // Aria est en train de quitter
 
 	log  *journal.Journal // aria.log (journal.go)
+
+	updMu  sync.Mutex  // protège update
+	update UpdateState // dernière vérification des versions (update.go)
+
 	ads  *blocklist.Store // liste de blocage des pubs (adblock.go)
 	adMu sync.Mutex       // une seule opération sur la liste à la fois
 }
@@ -196,6 +200,7 @@ type Status struct {
 	Components []Component   `json:"components"`
 	Resuming   string        `json:"resuming"` // réactivation automatique en cours
 	LogPath    string        `json:"logPath"`  // journal aria.log
+	NewVersion string        `json:"newVersion"` // version plus récente publiée, "" sinon
 	AdBlock    bool          `json:"adBlock"`  // pubs bloquées par le résolveur en cours
 	Version    string        `json:"version"`
 }
@@ -252,6 +257,7 @@ func (s *ShieldService) ServiceStartup(ctx context.Context, options application.
 	go s.refreshAutostart()
 	go s.resume()
 	go s.refreshBlocklist()
+	go s.checkUpdateAtStart()
 	return nil
 }
 
@@ -326,6 +332,7 @@ func (s *ShieldService) Status() Status {
 		},
 		Resuming: s.resumingText(),
 		LogPath:  s.log.Path(),
+		NewVersion: s.updateLatest(),
 		AdBlock:  s.adBlockActive(),
 		Version:  Version,
 	}

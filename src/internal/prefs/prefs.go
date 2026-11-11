@@ -40,6 +40,8 @@ type Prefs struct {
 	Last string `json:"derniere"`
 	// Notify : notifications Windows (incidents, sortie d'Aria).
 	Notify bool `json:"notifications"`
+	// CheckUpdates : vérifier au lancement si une version plus récente est publiée.
+	CheckUpdates bool `json:"verifier-versions"`
 	// BlockAds : blocage des pubs et des traceurs par le résolveur.
 	BlockAds bool `json:"blocage-pubs"`
 	// Allow : domaines que l'utilisateur ne veut pas voir bloqués. Revalidés
@@ -48,7 +50,7 @@ type Prefs struct {
 }
 
 // defaults : reprise et notifications activées, rien à reprendre au premier lancement.
-func defaults() Prefs { return Prefs{Resume: true, Last: None, Notify: true} }
+func defaults() Prefs { return Prefs{Resume: true, Last: None, Notify: true, CheckUpdates: true} }
 
 // Store lit et écrit reglages.json.
 type Store struct {

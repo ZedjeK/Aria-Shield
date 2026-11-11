@@ -335,6 +335,42 @@ export async function restoreAll() {
   app.page = 'dns'
 }
 
+// ---------- Nouvelles versions ----------
+
+/** Dernière vérification des versions (page Réglages). */
+export const update = $state({
+  data: null, // { enabled, checked, current, latest, available, url, error }
+  busy: false,
+})
+
+/** Relit le résultat de la dernière vérification (sans réseau). */
+export async function loadUpdate() {
+  try {
+    update.data = await ShieldService.UpdateInfo()
+  } catch {}
+}
+
+/** Interroge GitHub maintenant. */
+export async function checkUpdate() {
+  update.busy = true
+  try {
+    update.data = await ShieldService.CheckUpdate()
+  } catch (err) {
+    update.data = { ...(update.data ?? {}), error: message(err) }
+  } finally {
+    update.busy = false
+    refresh()
+  }
+}
+
+/** Active ou coupe la vérification au lancement. */
+export async function setUpdateCheck(on) {
+  try {
+    await ShieldService.SetUpdateCheck(on)
+  } catch {}
+  await loadUpdate()
+}
+
 // ---------- Blocage des pubs ----------
 
 /** État du blocage des pubs (page Résolveur DNS). */
