@@ -142,7 +142,7 @@ powershell -ExecutionPolicy Bypass -File .\build.ps1
 
 Le script télécharge Tor Browser 15.0.24 sur torproject.org (trop lourd pour le dépôt), installe le CLI [Wails v3](https://v3.wails.io/) si besoin, génère le projet dans `.work\`, y applique `src\` et produit `Aria-Shield.exe` à la racine. L'icône fournie dans `src/build/windows/icon.ico` est utilisée telle quelle.
 
-GitHub fait la même chose à chaque modification ([`.github/workflows/build.yml`](.github/workflows/build.yml)) : signature de Tor Browser vérifiée, tests Go, compilation. Pousser un tag `vX.Y` publie la release, son empreinte et son attestation.
+GitHub fait la même chose à chaque modification ([`.github/workflows/build.yml`](.github/workflows/build.yml)) : signature de Tor Browser vérifiée, tests Go, compilation. Pousser un tag `vX.Y` prépare la release en brouillon, avec son empreinte et son attestation ; elle est publiée à la main, après relecture.
 
 ## Lire le code
 
