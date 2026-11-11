@@ -112,6 +112,8 @@ Pour revenir à la normale à tout moment : « restaurer --tout », en bas de la
 
 Aria note ce qu'elle fait dans `%USERPROFILE%\.Aria-Shield\aria.log` : chaque action demandée et son résultat, les réactivations au lancement, les relances d'Unbound, les notifications, l'arrêt. Aucune clé ni contenu de profil VPN n'y est écrit, et l'IP de ta box y est masquée comme à l'écran. Au-delà d'1 Mo, le journal est archivé en `aria.log.1` au lancement suivant et repart de zéro.
 
+Quand le blocage des pubs est activé, Unbound note aussi chaque requête bloquée (le nom demandé) dans son propre journal, `%PROGRAMDATA%\AriaShield\unbound.log`, réservé aux administrateurs : c'est ce qu'Aria lit pour tenir son compteur, sans ouvrir de canal de commande vers le résolveur. Ce journal repart de zéro à chaque démarrage du résolveur, et Aria le fait repartir d'elle-même s'il dépasse 32 Mo. Le classement des domaines n'est gardé qu'en mémoire.
+
 ### Limites à connaître
 
 - Le blocage des pubs agit sur les noms de domaine : les pubs servies depuis le domaine du site lui-même (YouTube, par exemple) passent, et un navigateur dont le « DNS sécurisé » est activé contourne Aria (la page Tests le signale). Dans le navigateur, un bloqueur comme uBlock Origin reste plus efficace ; les deux se complètent.
