@@ -163,6 +163,9 @@ func Render(domains, allow []string) ([]byte, int) {
 	var b bytes.Buffer
 	b.WriteString("# Généré par Aria Shield : ne pas modifier, le fichier est réécrit à chaque mise à jour.\n")
 	b.WriteString("server:\n")
+	// Une ligne de journal par requête bloquée : c'est ce que lit le compteur
+	// (internal/blockstats). Actif seulement quand la liste est chargée.
+	b.WriteString("log-local-actions: yes\n")
 	fmt.Fprintf(&b, "local-zone: \"%s.\" always_null\n", Canary)
 	for _, a := range allow {
 		fmt.Fprintf(&b, "local-zone: \"%s.\" transparent\n", a)

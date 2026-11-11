@@ -41,6 +41,7 @@ const statut = {
   resuming: '',
   adBlock: dns,
   adPaused: false,
+  adBlocked: dns ? 1284 : 0,
   logPath: 'C:\\Users\\exemple\\.Aria-Shield\\aria.log',
   newVersion: etat === 'off' ? '0.12' : '',
   version: '0.11.0',
@@ -116,6 +117,17 @@ export const ShieldService = {
     list: { present: true, count: 60312, updated: '2026-11-11T07:05:21Z', source: 'OISD small', sourceId: 'small' },
     allow: ['suivi.transporteur-exemple.fr', 'liens.lettre-information-tres-longue.exemple.org'],
     pausedUntil: '',
+    blocked: {
+      total: dns ? 1284 : 0,
+      since: '2026-11-11T08:05:29Z',
+      top: dns
+        ? [
+            { domain: 'traceur.regie-publicitaire-exemple.net', count: 412 },
+            { domain: 'pixel.mesure-audience.example', count: 233 },
+            { domain: 'ads.exemple-pub.net', count: 97 },
+          ]
+        : [],
+    },
     choice: 'small',
     sources: [
       { id: 'small', name: 'OISD small', url: '', note: 'Pubs et traceurs, peu de faux positifs. Environ 60 000 domaines, 15 Mo de mémoire en plus.' },

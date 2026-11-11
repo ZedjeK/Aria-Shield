@@ -106,7 +106,7 @@ func TestRender(t *testing.T) {
 	seen := map[string]bool{}
 	for _, line := range strings.Split(strings.TrimSpace(text), "\n") {
 		switch {
-		case strings.HasPrefix(line, "#"), line == "server:":
+		case strings.HasPrefix(line, "#"), line == "server:", line == "log-local-actions: yes":
 		case strings.HasPrefix(line, `local-zone: "`) &&
 			(strings.HasSuffix(line, `." always_null`) || strings.HasSuffix(line, `." transparent`)):
 			if seen[line] {
