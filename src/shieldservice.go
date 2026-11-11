@@ -85,6 +85,10 @@ type ShieldService struct {
 
 	ads  *blocklist.Store // liste de blocage des pubs (adblock.go)
 	adMu sync.Mutex       // une seule opération sur la liste à la fois
+
+	pauseMu    sync.Mutex  // protège adPauseEnd et adPauseTimer
+	adPauseEnd time.Time   // fin de la suspension du blocage, zéro si aucune
+	adPauseTimer *time.Timer // reprise automatique
 }
 
 // NewShieldService prépare le service et ses moteurs (rien n'est lancé).
@@ -202,6 +206,7 @@ type Status struct {
 	LogPath    string        `json:"logPath"`  // journal aria.log
 	NewVersion string        `json:"newVersion"` // version plus récente publiée, "" sinon
 	AdBlock    bool          `json:"adBlock"`  // pubs bloquées par le résolveur en cours
+	AdPaused   bool          `json:"adPaused"` // blocage suspendu pour quelques minutes
 	Version    string        `json:"version"`
 }
 
@@ -334,6 +339,7 @@ func (s *ShieldService) Status() Status {
 		LogPath:  s.log.Path(),
 		NewVersion: s.updateLatest(),
 		AdBlock:  s.adBlockActive(),
+		AdPaused: s.adPaused(),
 		Version:  Version,
 	}
 }

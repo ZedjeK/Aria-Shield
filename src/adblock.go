@@ -33,7 +33,9 @@ type AdBlock struct {
 	Active  bool           `json:"active"`  // liste chargée par l'Unbound en cours
 	List    blocklist.Info `json:"list"`
 	Allow   []string       `json:"allow"`
-	Source  string         `json:"source"`
+	// PausedUntil : fin de la suspension en cours (heure locale « 15:04 »), "" sinon.
+	PausedUntil string `json:"pausedUntil"`
+	Source      string `json:"source"`
 	URL     string         `json:"url"`
 }
 
@@ -49,6 +51,7 @@ func (s *ShieldService) AdBlock() AdBlock {
 		Active:  s.adBlockActive(),
 		List:    s.ads.Info(),
 		Allow:   allow,
+		PausedUntil: s.adPausedUntil(),
 		Source:  blocklist.SourceName,
 		URL:     blocklist.SourceURL,
 	}
@@ -90,6 +93,7 @@ func (s *ShieldService) doSetAdBlock(on bool) SystemResult {
 	if on {
 		add("Blocage des pubs activé", true, countNote(s.ads.Info()))
 	} else {
+		s.clearPause() // couper le blocage annule une suspension en cours
 		add("Blocage des pubs coupé", true, "")
 	}
 	s.applyBlocklist(on, add, &res)
@@ -175,7 +179,7 @@ func (s *ShieldService) changeAllow(label string, change func([]string) []string
 // de la protection au même moment.
 func (s *ShieldService) applyBlocklist(on bool, add func(string, bool, string), res *SystemResult) {
 	path := ""
-	if on {
+	if on && !s.adPaused() {
 		path = s.ads.ConfPath()
 	}
 	s.dns.SetInclude(path)
@@ -210,6 +214,94 @@ func (s *ShieldService) applyBlocklist(on bool, add func(string, bool, string), 
 		res.Steps = append(res.Steps, s.sys.Disable("Le résolveur n'a pas redémarré : ton DNS d'origine a été remis.")...)
 	}
 	s.alert("DNS d'origine remis", "Le résolveur Unbound n'a pas redémarré après le changement de liste de blocage.")
+}
+
+// ---------- Suspension ----------
+
+// PauseAdBlock suspend le blocage pendant quelques minutes (un site casse, un
+// lien de suivi ne s'ouvre pas), puis le rétablit tout seul. Le réglage reste
+// activé : seule la liste est déchargée d'Unbound.
+func (s *ShieldService) PauseAdBlock(minutes int) SystemResult {
+	s.adMu.Lock()
+	defer s.adMu.Unlock()
+	var res SystemResult
+	add := func(label string, ok bool, note string) {
+		res.Steps = append(res.Steps, Step{Label: label, OK: ok, Note: note})
+	}
+	if !s.prefs.Load().BlockAds {
+		res.Error = "le blocage des pubs n'est pas activé"
+		return res
+	}
+	if minutes < 1 {
+		minutes = 1
+	}
+	if minutes > 120 {
+		minutes = 120
+	}
+	d := time.Duration(minutes) * time.Minute
+	s.pauseMu.Lock()
+	if s.adPauseTimer != nil {
+		s.adPauseTimer.Stop()
+	}
+	s.adPauseEnd = time.Now().Add(d)
+	s.adPauseTimer = time.AfterFunc(d, func() { s.ResumeAdBlock() })
+	until := s.adPauseEnd.Format("15:04")
+	s.pauseMu.Unlock()
+
+	add("Blocage des pubs suspendu", true, "reprise automatique à "+until)
+	s.applyBlocklist(true, add, &res)
+	s.logResult("Suspension du blocage des pubs", res.Steps, res.Error)
+	return res
+}
+
+// ResumeAdBlock rétablit le blocage avant la fin de la suspension (ou à son
+// terme, appelé par le minuteur).
+func (s *ShieldService) ResumeAdBlock() SystemResult {
+	s.adMu.Lock()
+	defer s.adMu.Unlock()
+	var res SystemResult
+	add := func(label string, ok bool, note string) {
+		res.Steps = append(res.Steps, Step{Label: label, OK: ok, Note: note})
+	}
+	if !s.adPaused() {
+		return res
+	}
+	s.clearPause()
+	on := s.prefs.Load().BlockAds
+	if on {
+		add("Blocage des pubs rétabli", true, countNote(s.ads.Info()))
+	}
+	s.applyBlocklist(on, add, &res)
+	s.logResult("Reprise du blocage des pubs", res.Steps, res.Error)
+	return res
+}
+
+// adPaused : une suspension est-elle en cours ?
+func (s *ShieldService) adPaused() bool {
+	s.pauseMu.Lock()
+	defer s.pauseMu.Unlock()
+	return !s.adPauseEnd.IsZero()
+}
+
+// adPausedUntil : heure de fin de la suspension, "" s'il n'y en a pas.
+func (s *ShieldService) adPausedUntil() string {
+	s.pauseMu.Lock()
+	defer s.pauseMu.Unlock()
+	if s.adPauseEnd.IsZero() {
+		return ""
+	}
+	return s.adPauseEnd.Format("15:04")
+}
+
+// clearPause annule la suspension et son minuteur.
+func (s *ShieldService) clearPause() {
+	s.pauseMu.Lock()
+	defer s.pauseMu.Unlock()
+	if s.adPauseTimer != nil {
+		s.adPauseTimer.Stop()
+		s.adPauseTimer = nil
+	}
+	s.adPauseEnd = time.Time{}
 }
 
 // refreshBlocklist met la liste à jour une fois par semaine, au lancement,

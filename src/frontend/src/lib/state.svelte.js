@@ -409,6 +409,18 @@ export async function addAllow(domain) {
   return Boolean(res && !res.error)
 }
 
+/** Suspend le blocage quelques minutes ; il reprend tout seul. */
+export async function pauseAdBlock(minutes) {
+  await run('Suspension du blocage des pubs', () => ShieldService.PauseAdBlock(minutes))
+  await loadAds()
+}
+
+/** Rétablit le blocage avant la fin de la suspension. */
+export async function resumeAdBlock() {
+  await run('Reprise du blocage des pubs', () => ShieldService.ResumeAdBlock())
+  await loadAds()
+}
+
 /** Retire une exception. */
 export async function removeAllow(domain) {
   await run('Exception au blocage', () => ShieldService.RemoveAllow(domain))

@@ -6,7 +6,7 @@
   import Switch from '../lib/Switch.svelte'
   import {
     app, startDNS, stopDNS, testDNS, enableSystemDNS, disableSystemDNS, blockedReason, chip, loadAdapters,
-    ads, loadAds, setAdBlock, updateBlocklist, addAllow, removeAllow,
+    ads, loadAds, setAdBlock, updateBlocklist, addAllow, removeAllow, pauseAdBlock, resumeAdBlock,
   } from '../lib/state.svelte.js'
 
   const running = $derived(app.status?.dnsRunning ?? false)
@@ -16,6 +16,13 @@
 
   onMount(() => {
     loadAdapters()
+    loadAds()
+  })
+  // La suspension peut finir (minuteur) ou commencer (menu de l'icône) sans
+  // passer par cette page : on relit quand l'état général change.
+  $effect(() => {
+    app.status?.adPaused
+    app.status?.adBlock
     loadAds()
   })
 
@@ -136,7 +143,9 @@
       <span class="row-text">
         <h2>Bloquer les pubs et les traceurs</h2>
         <span class="row-detail">
-          {#if ad?.active}
+          {#if ad?.pausedUntil}
+            En pause jusqu'à {ad.pausedUntil} : rien n'est bloqué pour l'instant
+          {:else if ad?.active}
             Actif : {listCount} domaines renvoyés vers 0.0.0.0
           {:else if ad?.enabled}
             Activé : s'appliquera au démarrage du résolveur
@@ -162,6 +171,11 @@
       <button class="btn-ghost" onclick={updateBlocklist} disabled={!ad || app.busy || Boolean(reason)}>
         {app.busy ? 'En cours…' : 'mettre à jour la liste'}
       </button>
+      {#if ad?.pausedUntil}
+        <button class="btn-ghost" onclick={resumeAdBlock} disabled={app.busy}>reprendre le blocage</button>
+      {:else if ad?.active}
+        <button class="btn-ghost" onclick={() => pauseAdBlock(10)} disabled={app.busy}>suspendre 10 min</button>
+      {/if}
     </div>
     {#if listDate}
       <p class="hint">Liste du {listDate} · mise à jour automatique chaque semaine, au lancement d'Aria.</p>
