@@ -89,6 +89,11 @@
         <span class="label">restaurer --tout</span>
       </button>
       <span class="version label">aria-shield v{app.status?.version ?? '…'}</span>
+      {#if app.status?.newVersion}
+        <button class="new-version label" onclick={() => (app.page = 'settings')} title="Voir la nouvelle version dans les réglages">
+          v{app.status.newVersion} disponible
+        </button>
+      {/if}
     </div>
   </nav>
 
@@ -296,6 +301,18 @@
   }
   .restore:disabled {
     opacity: 0.45;
+  }
+  .new-version {
+    padding: 0 4px;
+    border: none;
+    background: transparent;
+    text-align: left;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--action);
+  }
+  .new-version:hover {
+    text-decoration: underline;
   }
   .version {
     padding: 0 4px;

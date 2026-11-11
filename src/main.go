@@ -24,7 +24,7 @@ import (
 )
 
 // Version affichée dans l'interface (garder la même dans build/windows/info.json).
-const Version = "0.10.0"
+const Version = "0.11.0"
 
 // L'interface compilée par Vite est embarquée dans l'exe : rien n'est chargé
 // depuis internet ni depuis le disque.
@@ -66,8 +66,11 @@ func main() {
 		// Windows. Relancer l'exe ramène simplement la fenêtre existante.
 		SingleInstance: &application.SingleInstanceOptions{
 			UniqueID: "com.zedjek.aria-shield",
-			OnSecondInstanceLaunch: func(application.SecondInstanceData) {
-				svc.logf("exe relancé alors qu'Aria tourne déjà : fenêtre ramenée au premier plan")
+			// L'exe relancé annonce sa version : si elle diffère, Aria le dit
+			// au lieu de rouvrir sa fenêtre en silence.
+			AdditionalData: map[string]string{"version": Version},
+			OnSecondInstanceLaunch: func(data application.SecondInstanceData) {
+				go svc.otherVersionLaunched(data.AdditionalData["version"])
 				application.InvokeAsync(showWindow)
 			},
 		},

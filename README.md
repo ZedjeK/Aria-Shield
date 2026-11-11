@@ -38,6 +38,8 @@ Ton FAI voit chaque site que tu visites (par le DNS), peut en bloquer certains, 
 
 **Blocage des pubs et des traceurs** (en option, page Résolveur DNS) : le résolveur répond `0.0.0.0` pour les domaines de la liste [OISD small](https://oisd.nl), pour tout Windows et pas seulement le navigateur. Aria télécharge la liste, n'en garde que des noms de domaine valides et écrit elle-même les règles : une liste piégée ne peut rien rediriger, seulement bloquer. Un site ne marche plus ? Ajoute son domaine aux exceptions.
 
+**Versions** : Aria signale quand une version plus récente est publiée (une requête à GitHub quelques minutes après le lancement, désactivable dans les réglages ; rien n'est téléchargé ni installé). Et si tu lances un exe d'une autre version pendant qu'Aria tourne, elle te le dit au lieu de rouvrir l'ancienne fenêtre.
+
 **Toujours active si tu le veux** : fermer la fenêtre range Aria dans la zone de notification, sans rien couper. Dans « réglages », active « Démarrer avec Windows » : Aria se lance à l'ouverture de ta session, sans fenêtre UAC, et réactive ta dernière protection (DNS seul ou mode Discret).
 
 Une page **Tests** vérifie ce qu'Aria annonce : Windows passe bien par le résolveur, aucune fuite d'IP en IPv4 ou IPv6, kill switch actif, et navigateurs dont le « DNS sécurisé » contournerait Aria.
@@ -165,6 +167,7 @@ src/
 ├── startup.go                  # démarrage avec Windows, reprise de la protection, quitter
 ├── adblock.go                  # blocage des pubs : activation, mise à jour, exceptions
 ├── journal.go                  # aria.log : résultat de chaque action
+├── update.go                   # autre version lancée, nouvelle version publiée
 ├── notify.go                   # notifications Windows (incidents, sortie)
 ├── internal/
 │   ├── dnsengine/              # Unbound embarqué : extraction, lancement, tests
@@ -172,6 +175,7 @@ src/
 │   ├── paths/                  # emplacements des données, verrouillage, migration
 │   ├── prefs/                  # réglages et dernière protection (reglages.json)
 │   ├── journal/                # écriture du journal, sans jamais suivre un lien
+│   ├── appversion/             # comparaison de versions, dernière release GitHub
 │   ├── blocklist/              # liste de blocage : téléchargement, filtre, règles Unbound
 │   ├── autostart/              # tâche planifiée et copie protégée dans Program Files
 │   ├── toastreg/               # nettoyage du registre des notifications
