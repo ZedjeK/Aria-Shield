@@ -25,6 +25,7 @@ import (
 	"errors"
 	"net/netip"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -34,6 +35,7 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 
 	"aria-shield/internal/blocklist"
+	"aria-shield/internal/blockstats"
 	"aria-shield/internal/browsers"
 	"aria-shield/internal/dnsengine"
 	"aria-shield/internal/journal"
@@ -86,6 +88,8 @@ type ShieldService struct {
 	update UpdateState // dernière vérification des versions (update.go)
 
 	ads  *blocklist.Store // liste de blocage des pubs (adblock.go)
+	// blocked compte les requêtes bloquées en lisant le journal d'Unbound.
+	blocked *blockstats.Counter
 	adMu sync.Mutex       // une seule opération sur la liste à la fois
 
 	pauseMu    sync.Mutex  // protège adPauseEnd et adPauseTimer
@@ -152,6 +156,7 @@ func NewShieldService() *ShieldService {
 	s.prefs = prefs.New(userDir)
 	// La liste de blocage vit avec Unbound, dans le dossier verrouillé.
 	s.ads = blocklist.NewStore(unboundDir)
+	s.blocked = blockstats.New(filepath.Join(sysDir, "unbound.log"))
 	if s.prefs.Load().BlockAds {
 		s.dns.SetInclude(s.ads.ConfPath())
 	}
@@ -209,6 +214,7 @@ type Status struct {
 	NewVersion string        `json:"newVersion"` // version plus récente publiée, "" sinon
 	AdBlock    bool          `json:"adBlock"`  // pubs bloquées par le résolveur en cours
 	AdPaused   bool          `json:"adPaused"` // blocage suspendu pour quelques minutes
+	AdBlocked  int           `json:"adBlocked"` // requêtes bloquées depuis le lancement
 	Version    string        `json:"version"`
 }
 
@@ -268,6 +274,7 @@ func (s *ShieldService) ServiceStartup(ctx context.Context, options application.
 	go s.resume()
 	go s.refreshBlocklist()
 	go s.checkUpdateAtStart()
+	go s.watchBlocked()
 	return nil
 }
 
@@ -345,6 +352,7 @@ func (s *ShieldService) Status() Status {
 		NewVersion: s.updateLatest(),
 		AdBlock:  s.adBlockActive(),
 		AdPaused: s.adPaused(),
+		AdBlocked: s.blocked.Total(),
 		Version:  Version,
 	}
 }

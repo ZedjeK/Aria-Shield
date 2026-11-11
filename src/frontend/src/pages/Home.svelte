@@ -49,7 +49,9 @@
   const ip = $derived(protectedOn ? leak?.after?.v4 || 'celle du VPN' : 'celle de ta box')
   const dns = $derived(
     (protectedOn ? 'Unbound via le tunnel' : systemDns ? 'Unbound local' : 'DNS du FAI') +
-      ((protectedOn || systemDns) && app.status?.adBlock ? ' · pubs bloquées' : '') +
+      ((protectedOn || systemDns) && app.status?.adBlock
+        ? ` · pubs bloquées (${(app.status?.adBlocked ?? 0).toLocaleString('fr-FR')})`
+        : '') +
       (app.status?.adPaused ? ' · blocage des pubs en pause' : ''),
   )
 </script>

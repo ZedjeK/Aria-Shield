@@ -20,12 +20,24 @@ import (
 	"time"
 
 	"aria-shield/internal/blocklist"
+	"aria-shield/internal/blockstats"
 	"aria-shield/internal/prefs"
 )
 
 // refreshDelay : la mise à jour hebdomadaire attend que le réseau et la
 // reprise de la protection soient en place.
 const refreshDelay = 3 * time.Minute
+
+const (
+	// blockedInterval : cadence de lecture du journal d'Unbound par le compteur.
+	blockedInterval = 5 * time.Second
+	// topBlocked : nombre de domaines affichés dans « les plus bloqués ».
+	topBlocked = 8
+	// maxUnboundLog : au-delà, Unbound est redémarré pour repartir d'un
+	// journal vide (il n'a pas d'autre moyen de le faire tourner, son canal
+	// de commande étant fermé). Chaque requête bloquée y ajoute une ligne.
+	maxUnboundLog = 32 << 20
+)
 
 // AdBlock décrit le blocage, pour l'interface.
 type AdBlock struct {
@@ -35,6 +47,9 @@ type AdBlock struct {
 	Allow   []string       `json:"allow"`
 	// PausedUntil : fin de la suspension en cours (heure locale « 15:04 »), "" sinon.
 	PausedUntil string `json:"pausedUntil"`
+	// Blocked : requêtes bloquées depuis le lancement d'Aria, et les domaines
+	// de la liste qui en ont bloqué le plus.
+	Blocked blockstats.Stats `json:"blocked"`
 	// Choice : liste choisie ; Sources : celles proposées.
 	Choice  string             `json:"choice"`
 	Sources []blocklist.Source `json:"sources"`
@@ -53,6 +68,7 @@ func (s *ShieldService) AdBlock() AdBlock {
 		List:    s.ads.Info(),
 		Allow:   allow,
 		PausedUntil: s.adPausedUntil(),
+		Blocked: s.blocked.Snapshot(topBlocked),
 		Choice:  blocklist.SourceByID(p.List).ID,
 		Sources: blocklist.Sources,
 	}
@@ -249,6 +265,27 @@ func (s *ShieldService) SetBlocklist(id string) SystemResult {
 	}
 	s.logResult("Choix de la liste de blocage", res.Steps, res.Error)
 	return res
+}
+
+// watchBlocked tient le compteur à jour, et redémarre Unbound si son journal
+// devient trop gros.
+func (s *ShieldService) watchBlocked() {
+	for !s.quitting.Load() {
+		time.Sleep(blockedInterval)
+		s.blocked.Poll()
+		if s.blocked.Size() < maxUnboundLog || !s.adBlockActive() {
+			continue
+		}
+		s.adMu.Lock()
+		var res SystemResult
+		add := func(label string, ok bool, note string) {
+			res.Steps = append(res.Steps, Step{Label: label, OK: ok, Note: note})
+		}
+		s.blocked.Poll() // dernières lignes avant que le journal reparte de zéro
+		s.applyBlocklist(true, add, &res)
+		s.adMu.Unlock()
+		s.logResult("Journal d'Unbound trop gros : résolveur redémarré", res.Steps, res.Error)
+	}
 }
 
 // ---------- Suspension ----------

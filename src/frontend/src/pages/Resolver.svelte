@@ -33,6 +33,19 @@
     ad?.list?.present ? new Date(ad.list.updated).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '',
   )
   const listCount = $derived(ad?.list?.present ? ad.list.count.toLocaleString('fr-FR') : '')
+  const blockedTotal = $derived((ad?.blocked?.total ?? 0).toLocaleString('fr-FR'))
+  const blockedSince = $derived(
+    ad?.blocked?.since ? new Date(ad.blocked.since).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '',
+  )
+  const topBlocked = $derived(ad?.blocked?.top ?? [])
+
+  // Le compteur avance tout seul : on le relit pendant que la page est affichée.
+  $effect(() => {
+    const timer = setInterval(() => {
+      if (!app.busy) loadAds()
+    }, 5000)
+    return () => clearInterval(timer)
+  })
 
   async function submitAllow(event) {
     event.preventDefault()
@@ -195,6 +208,27 @@
       <p class="hint">{ad?.list?.source} du {listDate} · mise à jour automatique chaque semaine, au lancement d'Aria.</p>
     {/if}
 
+    {#if ad?.enabled}
+      <div class="blocked">
+        <span class="eyebrow">Requêtes bloquées</span>
+        <p class="blocked-total"><strong>{blockedTotal}</strong> depuis le lancement d'Aria{blockedSince ? ` (${blockedSince})` : ''}</p>
+        {#if topBlocked.length}
+          {#each topBlocked as b (b.domain)}
+            <div class="row">
+              <span class="row-text">
+                <span class="row-name mono">{b.domain}</span>
+              </span>
+              <span class="count">{b.count.toLocaleString('fr-FR')}</span>
+              <button class="btn-ghost tiny" onclick={() => addAllow(b.domain)} disabled={app.busy} aria-label={`Ne plus bloquer ${b.domain}`}>débloquer</button>
+            </div>
+          {/each}
+          <p class="hint">Les domaines qui bloquent le plus. Si un site ne marche plus, le coupable est souvent ici.</p>
+        {:else}
+          <p class="hint">Rien n'a encore été bloqué. Les domaines les plus bloqués s'afficheront ici.</p>
+        {/if}
+      </div>
+    {/if}
+
     <div class="allow">
       <span class="eyebrow">Exceptions</span>
       <form class="allow-form" onsubmit={submitAllow}>
@@ -304,6 +338,33 @@
   .list-note {
     font-size: 12px;
     line-height: 1.5;
+    color: var(--faint);
+  }
+  .blocked {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-top: 12px;
+    border-top: 1px solid var(--line-soft);
+  }
+  .blocked-total {
+    margin: 0;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .blocked-total strong {
+    font-family: var(--font-display);
+    font-size: 22px;
+    color: var(--accent);
+    margin-right: 6px;
+  }
+  .blocked .row .mono {
+    font-size: 12px;
+    overflow-wrap: anywhere;
+  }
+  .count {
+    flex: none;
+    font-size: 12px;
     color: var(--faint);
   }
   .allow {
