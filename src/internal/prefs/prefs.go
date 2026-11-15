@@ -32,6 +32,61 @@ const (
 	Discret = "discret" // résolveur, DNS de Windows, tunnel et kill switch
 )
 
+// Vitesses du fond animé.
+const (
+	Lente   = "lente"
+	Normale = "normale"
+	Rapide  = "rapide"
+)
+
+// Bornes du nombre de points du fond animé (curseurs de la page Réglages).
+const (
+	FondMinLow, FondMinHigh = 4, 40
+	FondMaxLow, FondMaxHigh = 10, 80
+)
+
+// Fond : réglages du fond animé (clés fond.actif, fond.vitesse, fond.minimum,
+// fond.maximum du contrat des applis Aria).
+type Fond struct {
+	// Actif : le fond animé est dessiné (sinon la zone principale reste unie).
+	Actif bool `json:"actif"`
+	// Vitesse : Lente, Normale ou Rapide.
+	Vitesse string `json:"vitesse"`
+	// Minimum et Maximum : nombre de points à l'écran, au plus bas et au plus haut.
+	Minimum int `json:"minimum"`
+	Maximum int `json:"maximum"`
+}
+
+// DefaultFond : le fond tourne, à vitesse normale, entre 10 et 26 points.
+func DefaultFond() Fond { return Fond{Actif: true, Vitesse: Normale, Minimum: 10, Maximum: 26} }
+
+// Normalize ramène le fond à des valeurs permises : vitesse inconnue = normale,
+// nombres bornés, maximum jamais sous le minimum. Le fichier est modifiable
+// sans droits admin : rien de ce qu'il contient n'est pris tel quel.
+func (f Fond) Normalize() Fond {
+	switch f.Vitesse {
+	case Lente, Normale, Rapide:
+	default:
+		f.Vitesse = Normale
+	}
+	f.Minimum = clamp(f.Minimum, FondMinLow, FondMinHigh)
+	f.Maximum = clamp(f.Maximum, FondMaxLow, FondMaxHigh)
+	if f.Maximum < f.Minimum {
+		f.Maximum = f.Minimum
+	}
+	return f
+}
+
+func clamp(v, lo, hi int) int {
+	if v < lo {
+		return lo
+	}
+	if v > hi {
+		return hi
+	}
+	return v
+}
+
 // Prefs est le contenu de reglages.json.
 type Prefs struct {
 	// Resume : réactiver au lancement la dernière protection choisie.
@@ -49,10 +104,14 @@ type Prefs struct {
 	// Allow : domaines que l'utilisateur ne veut pas voir bloqués. Revalidés
 	// par le paquet blocklist avant tout usage.
 	Allow []string `json:"exceptions,omitempty"`
+	// Fond : fond animé de la zone principale de la fenêtre.
+	Fond Fond `json:"fond"`
 }
 
 // defaults : reprise et notifications activées, rien à reprendre au premier lancement.
-func defaults() Prefs { return Prefs{Resume: true, Last: None, Notify: true, CheckUpdates: true} }
+func defaults() Prefs {
+	return Prefs{Resume: true, Last: None, Notify: true, CheckUpdates: true, Fond: DefaultFond()}
+}
 
 // Store lit et écrit reglages.json.
 type Store struct {
@@ -95,6 +154,7 @@ func (s *Store) loadLocked() Prefs {
 	if len(p.Allow) > maxAllow {
 		p.Allow = p.Allow[:maxAllow]
 	}
+	p.Fond = p.Fond.Normalize()
 	return p
 }
 
@@ -113,6 +173,7 @@ func (s *Store) SetLast(last string) error {
 }
 
 func (s *Store) saveLocked(p Prefs) error {
+	p.Fond = p.Fond.Normalize()
 	data, err := json.MarshalIndent(p, "", "  ")
 	if err != nil {
 		return err

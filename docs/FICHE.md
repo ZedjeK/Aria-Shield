@@ -8,7 +8,7 @@ jour quand l'appli change.
 | Nom | Aria Shield (dépôt et exe : `Aria-Shield`) |
 | Promesse | Naviguer discrètement en un clic : un résolveur DNS à toi, un VPN avec kill switch et Tor Browser, dans un seul exe portable. |
 | Élément orange du logo | l'œil, au centre du « A » glitché ; le logo est délavé quand rien ne protège |
-| Fond animé | pas encore posé : la refonte visuelle prévoit un « double sas » en flux continu (lignes qui vont de gauche à droite, un premier sas qui arrête une partie des points hostiles, un second où les autres, ralentis, s'arrêtent) ; la fiche sera complétée à sa livraison |
+| Fond animé | « double sas » en flux continu, dans la zone principale seulement (jamais sous le menu latéral), sous des panneaux opaques : des paquets partent de la gauche sur des couloirs horizontaux et vont vers la droite. Cyan, bleus et blancs : les connexions saines, qui traversent. Rouges : ce qu'Aria arrête ; le premier sas (le résolveur) en stoppe une partie, les autres ralentissent dans la zone de quarantaine et s'arrêtent au second (le kill switch). Le dessin suit l'état de la protection (deux sas, résolveur seul, aucun sas). Tiré au hasard à chaque passage : la couleur, la vitesse, le couloir et l'arrêt au premier ou au second sas. Par défaut, de 10 à 26 points à l'écran. Réglages `fond.actif`, `fond.vitesse` (lente, normale, rapide), `fond.minimum` et `fond.maximum` dans `reglages.json`. En pause quand la fenêtre est cachée, image fixe si Windows demande moins d'animations. Le coût processeur n'a pas encore été mesuré dans l'appli compilée. |
 | Stack | Go 1.25, Wails v3 (bêta) et Svelte 5 ; Unbound et WireGuardNT embarqués |
 | Droits administrateur | oui, dès le lancement (manifeste) : DNS des cartes réseau, carte VPN, filtres du pare-feu, Unbound sur le port 53. Tor Browser est lancé avec les droits normaux de l'utilisateur, par un assistant sans élévation. |
 | Démarrage automatique | oui, désactivé par défaut : tâche planifiée `\Aria Shield\Démarrage` qui lance une copie de l'exe rangée dans `%ProgramFiles%\Aria Shield`, avec `--silencieux` |
@@ -38,4 +38,4 @@ plus justifié se corrige.
   elle ne la télécharge ni ne l'installe.
 - **Version** : le tag est `v` suivi de `ProductVersion` dans `src/build/windows/info.json`
   (`v0.12.0`). Les versions publiées jusqu'à la 0.11 étaient nommées `vX.Y`.
-- **Pas encore faits** : installation par l'exe, refonte visuelle et fond animé.
+- **Pas encore faits** : installation par l'exe.

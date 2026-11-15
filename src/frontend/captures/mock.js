@@ -106,6 +106,8 @@ export const ShieldService = {
   SetAutostart: plus_tard(rien),
   SetResume: plus_tard(rien),
   SetNotifications: plus_tard(rien),
+  Fond: plus_tard({ actif: true, vitesse: 'normale', minimum: 10, maximum: 26 }),
+  SetFond: (actif, vitesse, minimum, maximum) => Promise.resolve({ actif, vitesse, minimum, maximum }),
   Quit: plus_tard(undefined),
 
   UpdateInfo: plus_tard({ enabled: true, checked: true, current: '0.11.0', latest: etat === 'off' ? '0.12' : '0.11.0', available: etat === 'off', url: 'https://github.com/ZedjeK/Aria-Shield/releases/latest', error: '' }),
