@@ -42,6 +42,11 @@ func main() {
 	if len(os.Args) > 1 && os.Args[1] == torbrowser.HelperArg {
 		os.Exit(torbrowser.RunHelper(os.Args[2:]))
 	}
+	// Secours du verrou persistant : retire le verrou, sans interface ni
+	// instance unique (marche même si une autre Aria tourne).
+	if slices.Contains(os.Args[1:], unlockArg) {
+		os.Exit(runUnlock())
+	}
 	// Lancée par la tâche planifiée à l'ouverture de session : pas de fenêtre.
 	silent := slices.Contains(os.Args[1:], autostart.SilentArg)
 

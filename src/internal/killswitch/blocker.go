@@ -21,6 +21,26 @@ type wfpObjectInstaller func(uintptr) error
 type baseObjects struct {
 	provider windows.GUID
 	filters  windows.GUID
+
+	// Aria Shield : réglages ajoutés pour le verrou persistant (lock_windows.go).
+	filterFlags        wtFwpmFilterFlags            // ajoutés à chaque filtre (PERSISTENT pour le verrou)
+	tunnelConnectFlags wtFwpmFilterFlags            // sorties par le tunnel (permitTunInterface)
+	nextKey            func() (windows.GUID, error) // clé fixe de chaque filtre ; nil : clé tirée par Windows
+}
+
+// addFilter ajoute un filtre avec les réglages de baseObjects (Aria Shield).
+// Le filtre de l'appelant n'est pas modifié : il sert pour plusieurs couches.
+func addFilter(session uintptr, bo *baseObjects, filter *wtFwpmFilter0, id *uint64) error {
+	f := *filter
+	f.flags |= bo.filterFlags
+	if bo.nextKey != nil {
+		key, err := bo.nextKey()
+		if err != nil {
+			return err
+		}
+		f.filterKey = key
+	}
+	return fwpmFilterAdd0(session, &f, 0, id)
 }
 
 var wfpSession uintptr
@@ -115,6 +135,9 @@ func EnableFirewall(luid uint64, doNotRestrict bool, restrictToDNSServers []neti
 		baseObjects, err := registerBaseObjects(session)
 		if err != nil {
 			return wrapErr(err)
+		}
+		if hardTunnelPermits.Load() {
+			baseObjects.tunnelConnectFlags = cFWPM_FILTER_FLAG_CLEAR_ACTION_RIGHT
 		}
 
 		err = permitWireGuardService(session, baseObjects, 15)
