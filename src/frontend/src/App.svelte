@@ -6,7 +6,8 @@
   import { Events } from '@wailsio/runtime'
   import Icon from './lib/Icon.svelte'
   import Logo from './lib/Logo.svelte'
-  import { app, refresh, startPolling, restoreAll, dismissNotice } from './lib/state.svelte.js'
+  import Fond from './lib/Fond.svelte'
+  import { app, refresh, startPolling, restoreAll, dismissNotice, loadFond } from './lib/state.svelte.js'
   import Home from './pages/Home.svelte'
   import Resolver from './pages/Resolver.svelte'
   import Tests from './pages/Tests.svelte'
@@ -38,6 +39,7 @@
   const pages = ['home', 'dns', 'vpn', 'ghost', 'tests', 'settings']
   onMount(() => {
     refresh()
+    loadFond()
     startPolling()
     const stop = Events.On('aller', (ev) => {
       const page = Array.isArray(ev.data) ? ev.data[0] : ev.data
@@ -106,6 +108,9 @@
     </div>
   </nav>
 
+  <!-- Zone principale : le fond animé passe sous les pages, jamais sous la barre latérale -->
+  <div class="main">
+  <Fond />
   <main class="content">
     <!-- Bandeaux d'alerte, communs à toutes les pages -->
     {#if app.status && !app.status.admin}
@@ -139,6 +144,7 @@
       <Settings />
     {/if}
   </main>
+  </div>
 </div>
 
 <style>
@@ -259,8 +265,8 @@
     align-items: flex-start;
     justify-content: space-between;
     gap: 12px;
-    background: color-mix(in srgb, var(--accent) 8%, transparent);
-    border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+    background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+    border-color: color-mix(in srgb, var(--accent) 40%, var(--surface));
     color: #bdf9ff;
   }
   .dismiss {
@@ -330,7 +336,15 @@
     color: var(--faint);
   }
 
+  .main {
+    position: relative;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+  }
   .content {
+    position: relative;
+    height: 100%;
     overflow-y: auto;
     padding: 26px 30px 30px;
     display: flex;

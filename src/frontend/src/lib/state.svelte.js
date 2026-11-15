@@ -477,6 +477,52 @@ export async function quitApp() {
   } catch {}
 }
 
+// ---------- Fond animé ----------
+
+/** Réglages du fond animé (clés fond.* de reglages.json), valeurs par défaut avant la première lecture. */
+export const fond = $state({ actif: true, vitesse: 'normale', minimum: 10, maximum: 26, error: '' })
+
+// Bornes des curseurs, les mêmes que côté Go (prefs.Fond.Normalize).
+export const FOND_MIN = [4, 40]
+export const FOND_MAX = [10, 80]
+
+function applyFond(res) {
+  fond.actif = res.actif
+  fond.vitesse = res.vitesse
+  fond.minimum = res.minimum
+  fond.maximum = res.maximum
+}
+
+/** Relit les réglages du fond. */
+export async function loadFond() {
+  try {
+    applyFond(await ShieldService.Fond())
+  } catch {}
+}
+
+// Un curseur envoie beaucoup de valeurs : l'écran suit tout de suite, le Go est
+// appelé une fois que la main s'arrête.
+let fondTimer = null
+
+/** Change un ou plusieurs réglages du fond ; { actif, vitesse, minimum, maximum }. */
+export function setFond(patch) {
+  Object.assign(fond, patch, { error: '' })
+  if (fond.minimum > fond.maximum) {
+    if ('minimum' in patch) fond.maximum = fond.minimum
+    else fond.minimum = fond.maximum
+  }
+  clearTimeout(fondTimer)
+  fondTimer = setTimeout(async () => {
+    try {
+      const res = await ShieldService.SetFond(fond.actif, fond.vitesse, fond.minimum, fond.maximum)
+      applyFond(res)
+      fond.error = res.error ?? ''
+    } catch (err) {
+      fond.error = message(err)
+    }
+  }, 250)
+}
+
 // ---------- Tests ----------
 
 /** Tests côté Windows : marqueur DNS, cartes, fuites, navigateurs. */

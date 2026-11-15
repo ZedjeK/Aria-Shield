@@ -7,6 +7,7 @@
   import {
     app, settings, loadSettings, setAutostart, setResume, setNotifications, quitApp,
     update, loadUpdate, checkUpdate, setUpdateCheck,
+    fond, setFond, FOND_MIN, FOND_MAX,
   } from '../lib/state.svelte.js'
 
   onMount(() => {
@@ -18,6 +19,13 @@
   const d = $derived(settings.data)
   const lastLabel = { aucune: 'aucune', dns: 'DNS (résolveur pour tout Windows)', discret: 'mode Discret (VPN + DNS)' }
   const admin = $derived(app.status?.admin ?? false)
+
+  // Vitesse du fond : un choix exclusif parmi trois.
+  const vitesses = [
+    { id: 'lente', label: 'lente' },
+    { id: 'normale', label: 'normale' },
+    { id: 'rapide', label: 'rapide' },
+  ]
 </script>
 
 <div class="page">
@@ -101,6 +109,67 @@
     </section>
   </div>
 
+  <!-- Fond animé de la zone principale -->
+  <section class="card">
+    <h2>Fond animé</h2>
+    <p class="card-text">
+      Des paquets traversent la fenêtre de gauche à droite. Les points cyan, bleus et blancs sont tes connexions : ils passent les deux sas. Les rouges sont ce qu'Aria arrête : le résolveur en stoppe une partie, les autres ralentissent dans la zone de quarantaine et s'arrêtent au kill switch. Le fond suit l'état de ta protection.
+    </p>
+    <div class="row">
+      <span class="row-text">
+        <span class="row-name">Afficher le fond animé</span>
+        <span class="row-detail">Il se met en pause quand la fenêtre est cachée, et ne bouge plus si Windows demande moins d'animations.</span>
+      </span>
+      <Switch checked={fond.actif} label="Afficher le fond animé" onchange={(on) => setFond({ actif: on })} />
+    </div>
+    <span class="eyebrow">Vitesse</span>
+    <div class="opts" role="radiogroup" aria-label="Vitesse du fond">
+      {#each vitesses as v (v.id)}
+        <button
+          class="opt"
+          class:on={fond.vitesse === v.id}
+          role="radio"
+          aria-checked={fond.vitesse === v.id}
+          disabled={!fond.actif}
+          onclick={() => setFond({ vitesse: v.id })}
+        >
+          {v.label}
+        </button>
+      {/each}
+    </div>
+    <label class="range">
+      <span class="eyebrow">Points à l'écran, au minimum</span>
+      <span class="range-line">
+        <input
+          type="range"
+          min={FOND_MIN[0]}
+          max={FOND_MIN[1]}
+          value={fond.minimum}
+          disabled={!fond.actif}
+          oninput={(e) => setFond({ minimum: Number(e.currentTarget.value) })}
+        />
+        <output>{fond.minimum}</output>
+      </span>
+    </label>
+    <label class="range">
+      <span class="eyebrow">Points à l'écran, au maximum</span>
+      <span class="range-line">
+        <input
+          type="range"
+          min={FOND_MAX[0]}
+          max={FOND_MAX[1]}
+          value={fond.maximum}
+          disabled={!fond.actif}
+          oninput={(e) => setFond({ maximum: Number(e.currentTarget.value) })}
+        />
+        <output>{fond.maximum}</output>
+      </span>
+    </label>
+    {#if fond.error}
+      <p class="error" role="alert">{fond.error}</p>
+    {/if}
+  </section>
+
   <!-- Nouvelles versions -->
   <section class="card">
     <h2>Version</h2>
@@ -160,6 +229,52 @@
     user-select: text;
     font-size: 12px;
     color: var(--accent);
+  }
+  .opts {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .opt {
+    min-height: 40px;
+    padding: 0 16px;
+    border: 1px solid var(--line-strong);
+    border-radius: 8px 0;
+    corner-shape: bevel;
+    background: transparent;
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 13px;
+  }
+  .opt.on {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+    color: var(--accent);
+  }
+  .opt:disabled {
+    opacity: 0.45;
+  }
+  .range {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .range-line {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .range input {
+    flex: 1;
+    min-width: 0;
+    accent-color: var(--accent);
+  }
+  .range output {
+    min-width: 2.5ch;
+    text-align: right;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--text);
   }
   .quit:hover:not(:disabled) {
     border-color: var(--action);

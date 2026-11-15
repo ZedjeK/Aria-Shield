@@ -7,6 +7,7 @@ sont dans `docs/releases/`.
 
 ### Ajouté
 
+- Fond animé « couloirs » dans la zone principale : un double sas en flux continu qui suit l'état de la protection, avec ses réglages (actif, vitesse, nombre de points) dans « réglages ».
 - Compteur de requêtes bloquées et classement des domaines qui bloquent le plus (page Résolveur DNS).
 - Fiche projet `docs/FICHE.md`, `SECURITY.md` et ce journal des versions.
 - Outils `tools\` communs aux applis Aria : tests, version, vérification d'une release, protection du dépôt.
