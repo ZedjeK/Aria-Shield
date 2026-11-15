@@ -114,6 +114,8 @@ Aria note ce qu'elle fait dans `%USERPROFILE%\.Aria-Shield\aria.log` : chaque ac
 
 Quand le blocage des pubs est activé, Unbound note aussi chaque requête bloquée (le nom demandé) dans son propre journal, `%PROGRAMDATA%\AriaShield\unbound.log`, réservé aux administrateurs : c'est ce qu'Aria lit pour tenir son compteur, sans ouvrir de canal de commande vers le résolveur. Ce journal repart de zéro à chaque démarrage du résolveur, et Aria le fait repartir d'elle-même s'il dépasse 32 Mo. Le classement des domaines n'est gardé qu'en mémoire.
 
+Pour signaler une faille : voir [SECURITY.md](SECURITY.md). Ce qu'Aria écrit hors de son dossier de données, et toutes ses connexions sortantes, sont listés dans la [fiche projet](docs/FICHE.md).
+
 ### Limites à connaître
 
 - Le blocage des pubs agit sur les noms de domaine : les pubs servies depuis le domaine du site lui-même (YouTube, par exemple) passent, et un navigateur dont le « DNS sécurisé » est activé contourne Aria (la page Tests le signale). Dans le navigateur, un bloqueur comme uBlock Origin reste plus efficace ; les deux se complètent.
