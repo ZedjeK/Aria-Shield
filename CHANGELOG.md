@@ -5,6 +5,10 @@ sont dans `docs/releases/`.
 
 ## Non publié
 
+Rien pour l'instant.
+
+## 0.12.0 (2026-11-15)
+
 ### Ajouté
 
 - Verrou au démarrage (désactivé par défaut) : en mode Discret, des règles de pare-feu persistantes bloquent tout hors du tunnel, du démarrage du PC jusqu'à la remontée du tunnel et après un plantage d'Aria. Commande de secours `Aria-Shield.exe --deverrouiller`.
@@ -25,6 +29,7 @@ sont dans `docs/releases/`.
 
 ### Sécurité
 
+- Dépendances mises à jour : `golang.org/x/sys` 0.50 et `vite` 8.3.8.
 - La compilation sépare la job qui lit (tests, exe) de celle qui peut écrire (release) ; un tag doit être sur la branche principale.
 
 ## 0.11.0 (2026-11-11)
