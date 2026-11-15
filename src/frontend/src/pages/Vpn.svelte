@@ -4,6 +4,8 @@
   // chaud), état du tunnel et test de connexion. Les clés ne reviennent
   // jamais du Go : le formulaire de modification les laisse vides, et un champ
   // vide garde la clé enregistrée.
+  import Subtabs from '../lib/Subtabs.svelte'
+  import Know from '../lib/Know.svelte'
   import {
     app, saveProfile, deleteProfile, useProfile, importConf, testVPN, formatBytes, formatAgo,
   } from '../lib/state.svelte.js'
@@ -74,6 +76,12 @@
     editing = null
     await importConf()
   }
+
+  const tabs = [
+    { id: 'profils', label: 'Profils' },
+    { id: 'tunnel', label: 'Tunnel' },
+  ]
+  let tab = $state('profils')
 </script>
 
 <div class="page">
@@ -81,13 +89,16 @@
     <h1>VPN</h1>
     <span class="pill" class:on={tunnel.up}>{tunnel.up ? 'Tunnel ouvert' : 'Tunnel fermé'}</span>
   </div>
-  <p class="page-intro">
-    Le moteur WireGuard officiel tourne depuis Aria. Importe le fichier <code>.conf</code> de ton fournisseur, ou recopie ses valeurs : tes profils restent chiffrés sur ton PC.
-  </p>
+  <Subtabs {tabs} bind:active={tab} />
+
+  {#if tab === 'profils'}
+    <Know>
+      Le moteur WireGuard officiel tourne depuis Aria. Importe le fichier <code>.conf</code> de ton fournisseur, ou recopie ses valeurs : tes profils restent chiffrés sur ton PC, et les clés ne reviennent jamais dans l'interface.
+    </Know>
 
   <div class="grid-2">
     <!-- Carnet de profils -->
-    <section class="card">
+    <section class="card" class:acc={editing === null}>
       <div class="card-head">
         <h2>Profils</h2>
         <span class="count">{profiles.length}/20</span>
@@ -135,9 +146,9 @@
       {/if}
     </section>
 
-    <!-- À droite : le formulaire quand on crée ou modifie un profil, sinon l'état du tunnel -->
+    <!-- À droite : le formulaire quand on crée ou modifie un profil -->
     {#if editing !== null}
-      <section class="card">
+      <section class="card acc">
         <div class="card-head">
           <h2>{editing ? `Modifier « ${editedProfile?.name ?? ''} »` : 'Nouveau profil'}</h2>
         </div>
@@ -207,11 +218,18 @@
 
           <div class="actions">
             <button type="submit" class="btn-primary grow" disabled={app.busy}>{app.busy ? 'enregistrement…' : 'enregistrer'}</button>
-            <button type="button" class="btn-ghost" onclick={() => (editing = null)} disabled={app.busy}>annuler</button>
+            <button type="button" class="btn-ghost quiet" onclick={() => (editing = null)} disabled={app.busy}>annuler</button>
           </div>
         </form>
       </section>
-    {:else}
+    {/if}
+  </div>
+
+  {:else}
+    <Know>
+      Le kill switch bloque tout ce qui ne passe pas par le tunnel, y compris pendant un changement de serveur.
+    </Know>
+
       <section class="card">
         <h2>Tunnel</h2>
         <div class="row"><span class="row-name">État</span><span class="value">{tunnel.up ? (tunnel.full ? 'Ouvert, tout le trafic' : 'Ouvert (test)') : 'Fermé'}</span></div>
@@ -230,8 +248,7 @@
           <p class="hint">Ouvre le tunnel du profil actif quelques secondes pour vérifier que le serveur reconnaît ta clé, sans toucher au reste.</p>
         {/if}
       </section>
-    {/if}
-  </div>
+  {/if}
 
   <!-- Journal de la dernière action (import, bascule, test…) -->
   <section class="card">

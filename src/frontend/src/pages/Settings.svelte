@@ -4,6 +4,8 @@
   // fenêtre range Aria dans la zone de notification ; seul « Quitter » l'arrête.
   import { onMount } from 'svelte'
   import Switch from '../lib/Switch.svelte'
+  import Subtabs from '../lib/Subtabs.svelte'
+  import Know from '../lib/Know.svelte'
   import {
     app, settings, loadSettings, setAutostart, setResume, setNotifications, quitApp,
     update, loadUpdate, checkUpdate, setUpdateCheck,
@@ -20,11 +22,19 @@
   const lastLabel = { aucune: 'aucune', dns: 'DNS (résolveur pour tout Windows)', discret: 'mode Discret (VPN + DNS)' }
   const admin = $derived(app.status?.admin ?? false)
 
+  // Sous-onglets de la page.
+  const tabs = [
+    { id: 'demarrage', label: 'Démarrage' },
+    { id: 'fond', label: 'Fond animé' },
+    { id: 'version', label: 'Version' },
+  ]
+  let tab = $state('demarrage')
+
   // Vitesse du fond : un choix exclusif parmi trois.
   const vitesses = [
-    { id: 'lente', label: 'lente' },
-    { id: 'normale', label: 'normale' },
-    { id: 'rapide', label: 'rapide' },
+    { id: 'lente', label: 'lente', detail: 'Paquets plus lents, fond plus calme.' },
+    { id: 'normale', label: 'normale', detail: 'Le rythme par défaut.' },
+    { id: 'rapide', label: 'rapide', detail: 'Paquets plus vifs, fond plus agité.' },
   ]
 </script>
 
@@ -32,9 +42,12 @@
   <div class="page-head">
     <h1>Réglages</h1>
   </div>
-  <p class="page-intro">
-    Fermer la fenêtre ne coupe rien : Aria reste dans la zone de notification, à côté de l'horloge, et ta protection continue. Pour l'arrêter vraiment, utilise « Quitter ».
-  </p>
+  <Subtabs {tabs} bind:active={tab} />
+
+  {#if tab === 'demarrage'}
+    <Know>
+      Fermer la fenêtre ne coupe rien : Aria reste dans la zone de notification, à côté de l'horloge, et ta protection continue. Pour l'arrêter vraiment, utilise « Quitter ».
+    </Know>
 
   <div class="grid-2">
     <!-- Démarrage avec Windows et reprise -->
@@ -109,12 +122,14 @@
     </section>
   </div>
 
+  {:else if tab === 'fond'}
+    <Know>
+      Le fond raconte ce que fait Aria. Les points cyan et bleus sont tes connexions ; les rouges, ce qu'Aria arrête. Premier sas : le résolveur (pubs, traceurs). Second sas : le kill switch. Il se met en pause quand la fenêtre est cachée et s'arrête si Windows demande moins d'animations.
+    </Know>
+
   <!-- Fond animé de la zone principale -->
   <section class="card">
     <h2>Fond animé</h2>
-    <p class="card-text">
-      Des paquets traversent la fenêtre de gauche à droite. Les points cyan, bleus et blancs sont tes connexions : ils passent les deux sas. Les rouges sont ce qu'Aria arrête : le résolveur en stoppe une partie, les autres ralentissent dans la zone de quarantaine et s'arrêtent au kill switch. Le fond suit l'état de ta protection.
-    </p>
     <div class="row">
       <span class="row-text">
         <span class="row-name">Afficher le fond animé</span>
@@ -133,7 +148,8 @@
           disabled={!fond.actif}
           onclick={() => setFond({ vitesse: v.id })}
         >
-          {v.label}
+          <span class="ot">{v.label}</span>
+          <span class="ob">{v.detail}</span>
         </button>
       {/each}
     </div>
@@ -170,6 +186,11 @@
     {/if}
   </section>
 
+  {:else}
+    <Know>
+      La vérification contacte api.github.com, qui voit ton adresse IP, ou celle du VPN en mode Discret. Rien n'est téléchargé ni installé.
+    </Know>
+
   <!-- Nouvelles versions -->
   <section class="card">
     <h2>Version</h2>
@@ -203,6 +224,7 @@
       <p class="hint">Version installée : {up?.current ?? app.status?.version ?? '…'}.</p>
     {/if}
   </section>
+  {/if}
 
   {#if app.logTitle && (app.log.length || app.actionError)}
     <section class="card">
@@ -229,30 +251,6 @@
     user-select: text;
     font-size: 12px;
     color: var(--accent);
-  }
-  .opts {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-  }
-  .opt {
-    min-height: 40px;
-    padding: 0 16px;
-    border: 1px solid var(--line-strong);
-    border-radius: 8px 0;
-    corner-shape: bevel;
-    background: transparent;
-    color: var(--muted);
-    font-family: var(--font-mono);
-    font-size: 13px;
-  }
-  .opt.on {
-    border-color: var(--accent);
-    background: color-mix(in srgb, var(--accent) 14%, var(--surface));
-    color: var(--accent);
-  }
-  .opt:disabled {
-    opacity: 0.45;
   }
   .range {
     display: flex;

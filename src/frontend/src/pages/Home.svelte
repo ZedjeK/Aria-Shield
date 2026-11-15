@@ -60,7 +60,7 @@
   <h1 class="cmd"><span class="cwd">~/aria</span> $ statut</h1>
 
   <!-- Niveau de protection : mot glitché, explication, logo -->
-  <section class="hero" aria-label="Niveau de protection">
+  <section class="hero card" aria-label="Niveau de protection">
     <div class="hero-text">
       <span class="eyebrow">Niveau de protection</span>
       <p class="word {tone}">{word}</p>
@@ -110,11 +110,17 @@
     </section>
 
     <!-- Mode et action principale (orange) -->
-    <section class="mode-panel" aria-label="Mode">
+    <section class="mode-panel card acc" aria-label="Mode">
       <span class="eyebrow">Mode</span>
-      <div class="modes">
-        <button class="mode" class:selected={app.mode === 'discret'} onclick={() => (app.mode = 'discret')} aria-pressed={app.mode === 'discret'}>discret</button>
-        <button class="mode ghost" class:selected={app.mode === 'fantome'} onclick={() => (app.mode = 'fantome')} aria-pressed={app.mode === 'fantome'}>fantôme</button>
+      <div class="opts" role="radiogroup" aria-label="Mode">
+        <button class="opt" class:on={app.mode === 'discret'} role="radio" aria-checked={app.mode === 'discret'} onclick={() => (app.mode = 'discret')}>
+          <span class="ot">discret</span>
+          <span class="ob">VPN et DNS local</span>
+        </button>
+        <button class="opt ghost" class:on={app.mode === 'fantome'} role="radio" aria-checked={app.mode === 'fantome'} onclick={() => (app.mode = 'fantome')}>
+          <span class="ot">fantôme</span>
+          <span class="ob">Tout passe par Tor</span>
+        </button>
       </div>
       <p class="mode-desc">
         {app.mode === 'fantome' ? 'Tout passe par Tor. Plus lent, plus anonyme.' : 'VPN + DNS local. Rapide, pour tous les jours.'}
@@ -122,18 +128,18 @@
 
       <div class="cta-zone">
         {#if app.mode === 'fantome'}
-          <button class="cta" onclick={() => { app.page = 'ghost'; launchTor() }} disabled={tor.busy || !app.status?.admin}>
+          <button class="btn-primary" onclick={() => { app.page = 'ghost'; launchTor() }} disabled={tor.busy || !app.status?.admin}>
             {tor.busy ? 'en cours…' : 'lancer tor browser'}
           </button>
           <p class="hint">{protectedOn ? 'Tor passera à travers ton VPN : combo idéal.' : 'Conseil : active d\'abord le mode Discret, pour que ton FAI ne voie pas Tor.'}</p>
         {:else if protectedOn}
-          <button class="cta" onclick={unprotect} disabled={app.busy}>{app.busy ? 'en cours…' : 'désactiver la protection'}</button>
+          <button class="btn-primary" onclick={unprotect} disabled={app.busy}>{app.busy ? 'en cours…' : 'désactiver la protection'}</button>
           <p class="hint">Tunnel, kill switch et DNS de Windows sont actifs. Tout revient comme avant à la désactivation.</p>
         {:else if !vpnReady}
-          <button class="cta" onclick={() => (app.page = 'vpn')}>configurer le vpn</button>
+          <button class="btn-primary" onclick={() => (app.page = 'vpn')}>configurer le vpn</button>
           <p class="hint">Importe d'abord le fichier .conf de ton fournisseur sur la page VPN.</p>
         {:else}
-          <button class="cta" onclick={protect} disabled={app.busy || !app.status?.admin}>
+          <button class="btn-primary" onclick={protect} disabled={app.busy || !app.status?.admin}>
             {app.busy ? 'activation… (jusqu\'à 30 s)' : 'activer la protection'}
           </button>
           {#if app.actionError && app.logTitle === 'Activation de la protection'}
@@ -166,10 +172,6 @@
     gap: 20px;
     align-items: center;
     padding: 22px 26px;
-    background: var(--surface);
-    border: 1px solid var(--line-strong);
-    border-radius: 18px;
-    corner-shape: bevel;
   }
   .hero-text {
     display: flex;
@@ -332,33 +334,8 @@
     gap: 12px;
     min-width: 0;
   }
-  .modes {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-  }
-  .mode {
-    --c: var(--accent);
-    min-height: 60px;
-    border: 1.5px solid var(--line-strong);
-    border-radius: 10px 0;
-    corner-shape: bevel;
-    background: transparent;
-    color: var(--text);
-    font-family: var(--font-mono);
-    font-size: 14px;
-    font-weight: 600;
-  }
-  .mode.ghost {
-    --c: var(--ghost);
-  }
-  .mode:hover:not(.selected) {
-    background: var(--hover);
-  }
-  .mode.selected {
-    border-color: var(--c);
-    color: var(--c);
-    background: color-mix(in srgb, var(--c) 10%, transparent);
+  .opt.ghost.on .ot {
+    background: var(--ghost);
   }
   .mode-desc {
     margin: 0;
@@ -371,23 +348,5 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
-  }
-  .cta {
-    width: 100%;
-    min-height: 52px;
-    border: none;
-    border-radius: 12px 0;
-    corner-shape: bevel;
-    background: var(--action);
-    color: var(--on-action);
-    font-family: var(--font-mono);
-    font-size: 15px;
-    font-weight: 600;
-  }
-  .cta:hover:not(:disabled) {
-    background: #ff9d42;
-  }
-  .cta:disabled {
-    opacity: 0.45;
   }
 </style>

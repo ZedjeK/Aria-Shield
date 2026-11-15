@@ -14,6 +14,10 @@ sont dans `docs/releases/`.
 
 - Icône de la zone de notification selon le contrat : pastille orange (à regarder), cyan (mode Discret) ou bleue (nouvelle version publiée) ; menu avec « Aller à », « Voir la mise à jour » et la case « Démarrer avec Windows ».
 
+### Modifié
+
+- Habillage de l'interface selon le contrat des applis Aria : panneaux à coins coupés et liseré cyan (accentué sur le panneau du bouton orange), boutons en biais, sous-onglets en encoche avec leur encadré « À savoir » (Résolveur DNS, VPN, Tests, Réglages), cartes à onglet pour les choix exclusifs (mode, liste de blocage, vitesse du fond).
+
 ### Corrigé
 
 - L'icône des notifications n'est plus déposée dans `%TEMP%` : Aria fait de `.Aria-Shield\cache` son dossier temporaire.
