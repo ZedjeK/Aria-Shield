@@ -2,6 +2,7 @@
   // Page « Mode Fantôme » : Tor Browser, embarqué dans l'exe et extrait au
   // premier lancement. Au clic : installation si besoin, vérification des mises
   // à jour (proposées, jamais imposées), puis lancement sans droits administrateur.
+  import Know from '../lib/Know.svelte'
   import { onMount } from 'svelte'
   import Icon from '../lib/Icon.svelte'
   import {
@@ -31,13 +32,13 @@
     <h1>Mode Fantôme</h1>
     <span class="pill" class:on={st?.running}>{st?.running ? 'Tor Browser ouvert' : st?.installed ? 'Prêt' : 'Intégré'}</span>
   </div>
-  <p class="page-intro">
-    Tor Browser fait rebondir ta navigation sur trois relais du réseau Tor : aucun site, ni ton FAI, ni le VPN ne peut relier ce que tu fais à ton IP.
-  </p>
+  <Know>
+    Tor Browser fait rebondir ta navigation sur trois relais du réseau Tor : aucun site, ni ton FAI, ni le VPN ne peut relier ce que tu fais à ton IP. Seul ce que tu fais dans Tor Browser est anonyme.
+  </Know>
 
   <div class="grid-2">
     <!-- Lancement, progression et proposition de mise à jour -->
-    <section class="card">
+    <section class="card acc">
       <div class="launch-head">
         <span class="ghost-icon"><Icon name="ghost" size={26} /></span>
         <span class="row-text">

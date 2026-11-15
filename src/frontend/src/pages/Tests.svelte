@@ -3,7 +3,16 @@
   // Résolveur (résolution, DNSSEC), Windows (marqueur, cartes), fuites d'IP
   // (IPv4, IPv6, kill switch) et navigateurs dont le DNS sécurisé contournerait Aria.
   // Chaque pastille vient de chip() : « En attente » tant que le test n'a pas de sens.
+  import Subtabs from '../lib/Subtabs.svelte'
+  import Know from '../lib/Know.svelte'
   import { app, testAll, chip } from '../lib/state.svelte.js'
+
+  const tabs = [
+    { id: 'resolveur', label: 'Résolveur et Windows' },
+    { id: 'fuites', label: 'Fuites d'IP' },
+    { id: 'navigateurs', label: 'Navigateurs' },
+  ]
+  let tab = $state('resolveur')
 
   const running = $derived(app.status?.dnsRunning ?? false)
   const systemDns = $derived(app.status?.systemDns ?? false)
@@ -30,7 +39,13 @@
       {app.busy ? 'En cours…' : 'Relancer'}
     </button>
   </div>
-  <p class="page-intro">Vérifie que ce qu'Aria annonce est vrai.</p>
+
+  <Subtabs {tabs} bind:active={tab} />
+
+  {#if tab === 'resolveur'}
+    <Know>
+      Vérifie que ce qu'Aria annonce est vrai : le résolveur répond, valide DNSSEC, et Windows passe bien par lui.
+    </Know>
 
   <div class="grid-2">
     <!-- Unbound répond-il, et valide-t-il DNSSEC ? -->
@@ -88,6 +103,11 @@
     </section>
   </div>
 
+  {:else if tab === 'fuites'}
+    <Know>
+      Les sites ne doivent jamais voir l'IP de ta box. Mesure via ipify.org, seulement quand la protection est active.
+    </Know>
+
   <!-- Les sites voient-ils encore l'IP de la box ? -->
   <section class="card">
     <h2>Fuites d'IP</h2>
@@ -123,12 +143,14 @@
     {/if}
   </section>
 
+  {:else}
+    <Know>
+      Certains navigateurs ont leur propre « DNS sécurisé » qui ignore Windows, et donc Aria. Aria le signale, sans rien modifier dans tes navigateurs.
+    </Know>
+
   <!-- Navigateurs réglés pour ignorer le DNS de Windows -->
   <section class="card">
     <h2>Navigateurs</h2>
-    <p class="card-text">
-      Certains navigateurs ont leur propre « DNS sécurisé » qui ignore Windows, et donc Aria. Aria se contente de le signaler : rien n'est modifié dans tes navigateurs.
-    </p>
     {#if !t}
       <p class="hint">Clique sur « Relancer » pour inspecter tes navigateurs.</p>
     {:else if browsers.length === 0}
@@ -150,5 +172,6 @@
       {/if}
     {/if}
   </section>
+  {/if}
 </div>
 

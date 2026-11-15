@@ -4,10 +4,19 @@
   // dont le DNS de Windows fait partie.
   import { onMount } from 'svelte'
   import Switch from '../lib/Switch.svelte'
+  import Subtabs from '../lib/Subtabs.svelte'
+  import Know from '../lib/Know.svelte'
   import {
     app, startDNS, stopDNS, testDNS, enableSystemDNS, disableSystemDNS, blockedReason, chip, loadAdapters,
     ads, loadAds, setAdBlock, updateBlocklist, addAllow, removeAllow, pauseAdBlock, resumeAdBlock, setBlocklist,
   } from '../lib/state.svelte.js'
+
+  const tabs = [
+    { id: 'resolveur', label: 'Résolveur' },
+    { id: 'blocage', label: 'Blocage des pubs' },
+    { id: 'cartes', label: 'Cartes réseau' },
+  ]
+  let tab = $state('resolveur')
 
   const running = $derived(app.status?.dnsRunning ?? false)
   const systemDns = $derived(app.status?.systemDns ?? false)
@@ -73,13 +82,14 @@
     <h1>Résolveur DNS</h1>
     <span class="pill" class:on={running}>{running ? 'Actif' : 'Arrêté'}</span>
   </div>
-  <p class="page-intro">
-    Unbound tourne depuis Aria, sans rien installer : récursion complète, DNSSEC, aucun DNS tiers. Il continue quand tu fermes la fenêtre (Aria reste dans la zone de notification) et s'arrête quand tu quittes Aria.
-  </p>
+  <Subtabs {tabs} bind:active={tab} />
 
-  <div class="grid-2">
+  {#if tab === 'resolveur'}
+    <Know>
+      Unbound tourne depuis Aria, sans rien installer : récursion complète, DNSSEC, aucun DNS tiers. Il continue quand tu fermes la fenêtre (Aria reste dans la zone de notification) et s'arrête quand tu quittes Aria.
+    </Know>
     <!-- Unbound : démarrage, arrêt et résultats des deux tests -->
-    <section class="card">
+    <section class="card acc">
       <h2>Résolveur</h2>
       <div class="actions">
         {#if running}
@@ -108,6 +118,11 @@
         </div>
       </div>
     </section>
+
+  {:else if tab === 'cartes'}
+    <Know>
+      Une carte réseau dont le DNS n'est pas celui d'Aria apparaît « Hors Aria » : Aria la réaligne toutes les 10 secondes tant que la protection est active.
+    </Know>
 
     <!-- Bascule du DNS de Windows, avec l'état de chaque carte réseau -->
     <section class="card">
@@ -148,7 +163,11 @@
         </div>
       {/if}
     </section>
-  </div>
+
+  {:else}
+    <Know>
+      Aria télécharge la liste choisie, n'en garde que des noms de domaine valides et écrit elle-même les règles : une liste piégée ne peut rien rediriger, seulement bloquer.
+    </Know>
 
   <!-- Blocage des pubs et des traceurs, avec les exceptions -->
   <section class="card">
@@ -180,17 +199,18 @@
     <p class="card-text">
       Aria télécharge la liste choisie, n'en garde que des noms de domaine valides et écrit elle-même les règles : une liste piégée ne peut rien rediriger, seulement bloquer. Activer, couper ou mettre à jour redémarre le résolveur (une à deux secondes sans résolution). Les pubs servies depuis le domaine du site lui-même ne sont pas bloquées.
     </p>
-    <div class="lists" role="group" aria-label="Liste de blocage">
+    <div class="opts" role="radiogroup" aria-label="Liste de blocage">
       {#each ad?.sources ?? [] as src (src.id)}
         <button
-          class="list"
-          class:selected={ad.choice === src.id}
-          aria-pressed={ad.choice === src.id}
+          class="opt"
+          class:on={ad.choice === src.id}
+          role="radio"
+          aria-checked={ad.choice === src.id}
           disabled={app.busy || Boolean(reason)}
           onclick={() => ad.choice !== src.id && setBlocklist(src.id)}
         >
-          <span class="list-name">{src.name}</span>
-          <span class="list-note">{src.note}</span>
+          <span class="ot">{src.name}</span>
+          <span class="ob">{src.note}</span>
         </button>
       {/each}
     </div>
@@ -254,6 +274,7 @@
       {/if}
     </div>
   </section>
+  {/if}
 
   <!-- Journal de la dernière action -->
   <section class="card">
@@ -293,52 +314,6 @@
   .mono {
     font-family: var(--font-mono);
     font-size: 11px;
-  }
-  .lists {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: 8px;
-  }
-  @container (min-width: 600px) {
-    .lists {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-  }
-  .list {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    padding: 10px 12px;
-    min-height: 44px;
-    border: 1.5px solid var(--line-strong);
-    border-radius: 10px 0;
-    corner-shape: bevel;
-    background: transparent;
-    color: var(--text);
-    font-family: var(--font-mono);
-    text-align: left;
-  }
-  .list:hover:not(.selected):not(:disabled) {
-    background: var(--hover);
-  }
-  .list.selected {
-    border-color: var(--accent);
-    background: color-mix(in srgb, var(--accent) 10%, transparent);
-  }
-  .list:disabled {
-    opacity: 0.45;
-  }
-  .list-name {
-    font-size: 13px;
-    font-weight: 600;
-  }
-  .list.selected .list-name {
-    color: var(--accent);
-  }
-  .list-note {
-    font-size: 12px;
-    line-height: 1.5;
-    color: var(--faint);
   }
   .blocked {
     display: flex;
