@@ -39,6 +39,7 @@ import (
 	"aria-shield/internal/browsers"
 	"aria-shield/internal/dnsengine"
 	"aria-shield/internal/journal"
+	"aria-shield/internal/killswitch"
 	"aria-shield/internal/leak"
 	"aria-shield/internal/paths"
 	"aria-shield/internal/prefs"
@@ -92,6 +93,10 @@ type ShieldService struct {
 	// mis à jour par SetAutostart) ; le menu de l'icône ne peut pas interroger
 	// le Planificateur de tâches toutes les 3 s.
 	autostartOn atomic.Bool
+	// lockOn : le verrou persistant est posé (verrou.go) ; userQuit : « Quitter »
+	// a été demandé, ce qui retire le verrou, alors qu'une fin de session le garde.
+	lockOn   atomic.Bool
+	userQuit atomic.Bool
 	// blocked compte les requêtes bloquées en lisant le journal d'Unbound.
 	blocked *blockstats.Counter
 	adMu sync.Mutex       // une seule opération sur la liste à la fois
@@ -220,6 +225,7 @@ type Status struct {
 	AdPaused   bool          `json:"adPaused"` // blocage suspendu pour quelques minutes
 	AdBlocked  int           `json:"adBlocked"` // requêtes bloquées depuis le lancement
 	Version    string        `json:"version"`
+	Locked     bool          `json:"locked"` // verrou au démarrage posé
 }
 
 // ActionResult regroupe le journal d'une action et le test qui la suit.
@@ -274,6 +280,7 @@ func (s *ShieldService) ServiceStartup(ctx context.Context, options application.
 	if recovered, steps := s.sys.RecoverLeftover(); recovered {
 		s.logResult("DNS laissé sur Aria par une session interrompue : restauration", steps, "")
 	}
+	s.checkLockAtStart()
 	go s.refreshAutostart()
 	go s.resume()
 	go s.refreshBlocklist()
@@ -295,6 +302,15 @@ func (s *ShieldService) ServiceShutdown() error {
 		s.sys.Disable("")
 	}
 	s.dns.Stop()
+	// « Quitter » retire le verrou ; une fin de session Windows le laisse : il
+	// protège le prochain démarrage.
+	if s.userQuit.Load() {
+		if st, was := s.dropLock("« Quitter » demandé"); was {
+			s.logf("%s : %s", st.Label, st.Note)
+		}
+	} else if s.lockOn.Load() {
+		s.logf("fin de session Windows : verrou laissé en place, Internet coupé hors d'Aria jusqu'à la remontée du tunnel")
+	}
 	return nil
 }
 
@@ -358,6 +374,7 @@ func (s *ShieldService) Status() Status {
 		AdPaused: s.adPaused(),
 		AdBlocked: s.blocked.Total(),
 		Version:  Version,
+		Locked:   s.lockOn.Load(),
 	}
 }
 
@@ -641,6 +658,14 @@ func (s *ShieldService) doUseVPNProfile(id string) SystemResult {
 	if err := s.store.SetActive(id); err != nil {
 		add("Profil actif enregistré", false, err.Error())
 	}
+	// Un serveur désigné par un nom ne serait plus joignable sous verrou.
+	if s.lockOn.Load() {
+		if _, why := s.lockCheck(); why != "" {
+			if st, was := s.dropLock(why); was {
+				res.Steps = append(res.Steps, st)
+			}
+		}
+	}
 
 	v := leak.Compare(s.boxIPs, leak.Public())
 	s.lastLeak = masked(v)
@@ -783,7 +808,20 @@ func (s *ShieldService) protect() SystemResult {
 		add("Windows utilise déjà le résolveur", true, "")
 	}
 
-	// 4. Tunnel complet + kill switch.
+	// 4. Verrou au démarrage : voulu et possible ? Les sorties par le tunnel
+	// sont alors autorisées en dur, pour que le verrou ne les bloque pas.
+	lockExe, lockWhy := "", ""
+	if s.prefs.Load().Verrou {
+		lockExe, lockWhy = s.lockCheck()
+	}
+	killswitch.SetHardTunnel(lockExe != "")
+	if lockWhy != "" {
+		if st, was := s.dropLock(lockWhy); was {
+			res.Steps = append(res.Steps, st)
+		}
+	}
+
+	// 5. Tunnel complet + kill switch.
 	dns4 := []netip.Addr{netip.MustParseAddr("127.0.0.1")}
 	var dns6 []netip.Addr
 	if s.dns.IPv6() {
@@ -796,14 +834,19 @@ func (s *ShieldService) protect() SystemResult {
 	add("Tunnel « "+vpn.AdapterName+" » ouvert", true, p.Name)
 	add("Kill switch activé", true, "tout ce qui ne passe pas par le tunnel est bloqué")
 
-	// 5. Le serveur doit répondre, sinon on annule tout.
+	// 6. Le serveur doit répondre, sinon on annule tout.
 	if !s.tun.WaitHandshake(15 * time.Second) {
 		add("Poignée de main avec le serveur", false, "aucune réponse en 15 s")
 		return fail("le serveur VPN ne répond pas : protection annulée, connexion d'origine remise")
 	}
 	add("Poignée de main avec le serveur", true, "")
 
-	// 6. Test de fuite.
+	// 7. Verrou posé une fois le tunnel monté.
+	if lockExe != "" {
+		res.Steps = append(res.Steps, s.postLock(lockExe))
+	}
+
+	// 8. Test de fuite.
 	v := leak.Compare(s.boxIPs, leak.Public())
 	s.lastLeak = masked(v)
 	add("Test de fuite", v.V4OK && v.V6OK, v.Detail)
@@ -842,6 +885,10 @@ func (s *ShieldService) doUnprotect() SystemResult {
 	if s.sys.Enabled() {
 		res.Steps = append(res.Steps, s.sys.Disable("")...)
 	}
+	if st, was := s.dropLock("protection désactivée"); was {
+		res.Steps = append(res.Steps, st)
+	}
+	killswitch.SetHardTunnel(false)
 	s.ownsDNS = false
 	s.lastLeak = nil
 	return res

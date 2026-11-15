@@ -164,6 +164,12 @@ func (s *ShieldService) SetResume(on bool) SystemResult {
 	return res
 }
 
+func (s *ShieldService) SetLock(on bool) SystemResult {
+	res := s.doSetLock(on)
+	s.logResult(onOff(on, "Verrou au démarrage"), res.Steps, res.Error)
+	return res
+}
+
 func (s *ShieldService) SetNotifications(on bool) SystemResult {
 	res := s.doSetNotifications(on)
 	s.logResult(onOff(on, "Notifications Windows"), res.Steps, res.Error)

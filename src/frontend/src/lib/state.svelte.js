@@ -463,6 +463,12 @@ export async function setResume(on) {
   await loadSettings()
 }
 
+/** Active ou coupe le verrou au démarrage (pare-feu persistant en mode Discret). */
+export async function setLock(on) {
+  await run(on ? 'Verrou au démarrage' : 'Arrêt du verrou au démarrage', () => ShieldService.SetLock(on))
+  await loadSettings()
+}
+
 /** Active ou non les notifications Windows (incidents, sortie d'Aria). */
 export async function setNotifications(on) {
   await run('Notifications Windows', () => ShieldService.SetNotifications(on))
