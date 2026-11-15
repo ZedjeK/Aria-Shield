@@ -13,7 +13,7 @@ sont dans `docs/releases/`.
 
 ### Corrigé
 
-- L'icône des notifications n'est plus déposée dans `%TEMP%`.
+- L'icône des notifications n'est plus déposée dans `%TEMP%` : Aria fait de `.Aria-Shield\cache` son dossier temporaire.
 
 ### Sécurité
 

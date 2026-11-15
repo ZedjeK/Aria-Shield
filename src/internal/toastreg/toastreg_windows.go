@@ -23,9 +23,11 @@ const (
 // Un GUID entre accolades : rien d'autre n'est jamais effacé sous CLSID.
 var guidRe = regexp.MustCompile(`^\{[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}\}$`)
 
-// Remove efface les clés de notification de l'appli appName. Une clé absente
+// Remove efface les clés de notification de l'appli appName, et l'icône déposée
+// dans le dossier temporaire du processus et dans extraTempDirs (l'ancien
+// %TEMP%, d'avant que le dossier temporaire soit redirigé). Une clé absente
 // n'est pas une erreur.
-func Remove(appName string) error {
+func Remove(appName string, extraTempDirs ...string) error {
 	var errs []error
 	del := func(path string) {
 		if err := registry.DeleteKey(registry.CURRENT_USER, path); err != nil && !errors.Is(err, registry.ErrNotExist) {
@@ -41,7 +43,12 @@ func Remove(appName string) error {
 	if guidRe.MatchString(guid) {
 		del(clsidPath + guid + `\LocalServer32`)
 		del(clsidPath + guid)
-		os.Remove(filepath.Join(os.TempDir(), appName+guid+".png"))
+		icone := appName + guid + ".png"
+		for _, dir := range append([]string{os.TempDir()}, extraTempDirs...) {
+			if dir != "" {
+				os.Remove(filepath.Join(dir, icone))
+			}
+		}
 	}
 	// go-toast inscrit aussi son exe sous un GUID fixe, le même pour toutes les
 	// applis qui l'utilisent (il ne tient pas compte du GUID propre à l'appli) :

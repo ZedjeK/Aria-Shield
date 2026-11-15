@@ -3,4 +3,4 @@
 package toastreg
 
 // Remove n'a rien à faire hors Windows.
-func Remove(appName string) error { return nil }
+func Remove(appName string, extraTempDirs ...string) error { return nil }
