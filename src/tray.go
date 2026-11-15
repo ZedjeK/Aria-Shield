@@ -3,11 +3,13 @@ package main
 // Zone de notification : l'icône, son infobulle et son menu suivent l'état de
 // la protection, pour tout voir et tout faire sans ouvrir la fenêtre.
 //
-//	icône      délavée (rien ne protège), normale (DNS), pastille cyan (mode
-//	           Discret), pastille jaune (fuite détectée)
+//	icône      délavée (rien ne protège), pleine (DNS) ; une seule pastille à la
+//	           fois, par priorité : orange (fuite, à regarder), cyan (mode
+//	           Discret, l'appli agit), bleue (nouvelle version publiée)
 //	infobulle  « Aria Shield · DNS protégé · pubs bloquées »
-//	menu       ouvrir, activer ou couper le DNS, le mode Discret, changer de
-//	           serveur, suspendre le blocage des pubs, quitter
+//	menu       ouvrir · état · agir sans ouvrir (DNS, mode Discret, changer de
+//	           serveur, pause des pubs) · aller à une page · voir la mise à jour
+//	           (si elle existe) · démarrer avec Windows · quitter
 //
 // watch relit l'état toutes les 3 s et ne touche à l'icône ou au menu que s'il
 // a changé. Une action du menu s'exécute hors du fil de l'interface ; pendant
@@ -29,8 +31,12 @@ import (
 var (
 	//go:embed build/tray/off.png
 	iconOff []byte
+	//go:embed build/tray/off-info.png
+	iconOffInfo []byte
 	//go:embed build/tray/dns.png
 	iconDNS []byte
+	//go:embed build/tray/dns-info.png
+	iconDNSInfo []byte
 	//go:embed build/tray/discret.png
 	iconDiscret []byte
 	//go:embed build/tray/alerte.png
@@ -57,12 +63,26 @@ type trayState struct {
 	AdsPaused bool
 	Active    string // nom du profil VPN actif
 	Others    []trayProfile
+	Update    string // version plus récente publiée, "" sinon
+	Autostart bool   // démarrage avec Windows activé
+}
+
+// trayPage est une page de l'interface où le menu peut mener.
+type trayPage struct{ ID, Label string }
+
+var trayPages = []trayPage{
+	{"home", "Accueil"},
+	{"dns", "Résolveur DNS"},
+	{"vpn", "VPN"},
+	{"ghost", "Mode Fantôme"},
+	{"tests", "Tests"},
+	{"settings", "Réglages"},
 }
 
 // signature résume l'état : l'icône et le menu ne sont refaits que si elle change.
 func (st trayState) signature() string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "%v|%v|%v|%v|%v|%v|%v|%s", st.DNS, st.Protected, st.Leak, st.VPNReady, st.Ads, st.AdsOn, st.AdsPaused, st.Active)
+	fmt.Fprintf(&b, "%v|%v|%v|%v|%v|%v|%v|%s|%s|%v", st.DNS, st.Protected, st.Leak, st.VPNReady, st.Ads, st.AdsOn, st.AdsPaused, st.Active, st.Update, st.Autostart)
 	for _, p := range st.Others {
 		b.WriteString("|" + p.ID + "=" + p.Name)
 	}
@@ -91,17 +111,26 @@ func (st trayState) summary() string {
 	case st.AdsPaused:
 		s += " · blocage des pubs en pause"
 	}
+	if st.Update != "" {
+		s += " · version " + st.Update + " disponible"
+	}
 	return s
 }
 
+// icon choisit le dessin : orange (à regarder) avant cyan (l'appli agit) avant
+// bleu (information).
 func (st trayState) icon() []byte {
 	switch {
 	case st.Protected && st.Leak:
 		return iconAlert
 	case st.Protected:
 		return iconDiscret
+	case st.DNS && st.Update != "":
+		return iconDNSInfo
 	case st.DNS:
 		return iconDNS
+	case st.Update != "":
+		return iconOffInfo
 	}
 	return iconOff
 }
@@ -115,6 +144,8 @@ func (s *ShieldService) trayState() trayState {
 		Ads:       s.adBlockActive(),
 		AdsOn:     s.prefs.Load().BlockAds,
 		AdsPaused: s.adPaused(),
+		Update:    s.updateLatest(),
+		Autostart: s.autostartOn.Load(),
 	}
 	s.mu.Lock()
 	if s.lastLeak != nil {
@@ -139,7 +170,8 @@ type trayUI struct {
 	svc  *ShieldService
 	tray *application.SystemTray
 	show func()
-	mu   sync.Mutex // refresh vient de watch et de la fin d'une action
+	goTo func(page string) // ouvre la fenêtre sur une page
+	mu   sync.Mutex        // refresh vient de watch et de la fin d'une action
 	last string
 	busy atomic.Bool
 }
@@ -173,6 +205,7 @@ func (t *trayUI) menu(st trayState) *application.Menu {
 	m.Add("Ouvrir Aria Shield").OnClick(func(*application.Context) { t.show() })
 	m.AddSeparator()
 	m.Add("État : " + st.summary()).SetEnabled(false)
+	m.AddSeparator()
 
 	switch {
 	case st.Protected:
@@ -209,14 +242,32 @@ func (t *trayUI) menu(st trayState) *application.Menu {
 	}
 
 	m.AddSeparator()
+	nav := m.AddSubmenu("Aller à")
+	for _, p := range trayPages {
+		id := p.ID
+		nav.Add(p.Label).OnClick(func(*application.Context) { t.goTo(id) })
+	}
+	if st.Update != "" {
+		m.Add("Voir la mise à jour (" + st.Update + ")").OnClick(func(*application.Context) { t.goTo("settings") })
+	}
+
+	m.AddSeparator()
+	on := st.Autostart
+	m.AddCheckbox("Démarrer avec Windows", on).OnClick(t.handler("Démarrer avec Windows",
+		func() string { return t.svc.SetAutostart(!on).Error }))
 	m.Add("Quitter (rétablit ta connexion d'origine)").OnClick(func(*application.Context) { go t.svc.quit() })
 	return m
 }
 
-// action ajoute une entrée qui lance do hors du fil de l'interface. Une seule
-// action à la fois ; un échec est signalé par notification.
+// action ajoute une entrée qui lance do hors du fil de l'interface.
 func (t *trayUI) action(m *application.Menu, label string, do func() string) {
-	m.Add(label).OnClick(func(*application.Context) {
+	m.Add(label).OnClick(t.handler(label, do))
+}
+
+// handler lance do hors du fil de l'interface. Une seule action à la fois ; un
+// échec est signalé par notification, la fenêtre pouvant être fermée.
+func (t *trayUI) handler(label string, do func() string) func(*application.Context) {
+	return func(*application.Context) {
 		if !t.busy.CompareAndSwap(false, true) {
 			return
 		}
@@ -227,7 +278,7 @@ func (t *trayUI) action(m *application.Menu, label string, do func() string) {
 			}
 			t.refresh()
 		}()
-	})
+	}
 }
 
 // enableDNSFromTray démarre le résolveur puis le fait utiliser par Windows.

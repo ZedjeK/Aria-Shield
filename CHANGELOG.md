@@ -11,6 +11,8 @@ sont dans `docs/releases/`.
 - Fiche projet `docs/FICHE.md`, `SECURITY.md` et ce journal des versions.
 - Outils `tools\` communs aux applis Aria : tests, version, vérification d'une release, protection du dépôt.
 
+- Icône de la zone de notification selon le contrat : pastille orange (à regarder), cyan (mode Discret) ou bleue (nouvelle version publiée) ; menu avec « Aller à », « Voir la mise à jour » et la case « Démarrer avec Windows ».
+
 ### Corrigé
 
 - L'icône des notifications n'est plus déposée dans `%TEMP%` : Aria fait de `.Aria-Shield\cache` son dossier temporaire.

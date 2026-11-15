@@ -3,6 +3,7 @@
   // console, « restaurer --tout ») et zone de contenu qui affiche la page
   // choisie. Il n'y a pas de routeur : app.page suffit, la fenêtre étant unique.
   import { onMount } from 'svelte'
+  import { Events } from '@wailsio/runtime'
   import Icon from './lib/Icon.svelte'
   import Logo from './lib/Logo.svelte'
   import { app, refresh, startPolling, restoreAll, dismissNotice } from './lib/state.svelte.js'
@@ -32,9 +33,17 @@
 
   // Premier état tout de suite, puis toutes les 5 s : une restauration
   // automatique (Unbound arrêté, Aria relancée après un plantage) doit se voir.
+  // Le menu de l'icône de la zone de notification ouvre la fenêtre sur une page :
+  // le Go envoie l'événement « aller » avec l'identifiant de la page.
+  const pages = ['home', 'dns', 'vpn', 'ghost', 'tests', 'settings']
   onMount(() => {
     refresh()
     startPolling()
+    const stop = Events.On('aller', (ev) => {
+      const page = Array.isArray(ev.data) ? ev.data[0] : ev.data
+      if (pages.includes(page)) app.page = page
+    })
+    return stop
   })
 </script>
 
