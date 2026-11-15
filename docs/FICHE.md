@@ -38,5 +38,4 @@ plus justifié se corrige.
   elle ne la télécharge ni ne l'installe.
 - **Version** : le tag est `v` suivi de `ProductVersion` dans `src/build/windows/info.json`
   (`v0.12.0`). Les versions publiées jusqu'à la 0.11 étaient nommées `vX.Y`.
-- **Pas encore faits** : installation par l'exe, menu de l'icône complet, refonte visuelle
-  et fond animé.
+- **Pas encore faits** : installation par l'exe, refonte visuelle et fond animé.

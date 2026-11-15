@@ -88,6 +88,10 @@ type ShieldService struct {
 	update UpdateState // dernière vérification des versions (update.go)
 
 	ads  *blocklist.Store // liste de blocage des pubs (adblock.go)
+	// autostartOn : le démarrage avec Windows est activé (lu une fois, puis
+	// mis à jour par SetAutostart) ; le menu de l'icône ne peut pas interroger
+	// le Planificateur de tâches toutes les 3 s.
+	autostartOn atomic.Bool
 	// blocked compte les requêtes bloquées en lisant le journal d'Unbound.
 	blocked *blockstats.Counter
 	adMu sync.Mutex       // une seule opération sur la liste à la fois

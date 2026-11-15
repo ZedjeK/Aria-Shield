@@ -125,7 +125,14 @@ func main() {
 	// protection (tray.go).
 	tray := app.SystemTray.New()
 	tray.OnClick(showWindow)
-	ui := &trayUI{svc: svc, tray: tray, show: showWindow}
+	// Ouvre la fenêtre, puis dit à l'interface sur quelle page aller.
+	goTo := func(page string) {
+		application.InvokeAsync(func() {
+			showWindow()
+			app.Event.Emit("aller", page)
+		})
+	}
+	ui := &trayUI{svc: svc, tray: tray, show: showWindow, goTo: goTo}
 	ui.refresh()
 	go ui.watch()
 

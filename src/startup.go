@@ -42,7 +42,9 @@ type Settings struct {
 // n'appeler qu'à l'ouverture de la carte, pas toutes les 5 s).
 func (s *ShieldService) Settings() Settings {
 	p := s.prefs.Load()
-	return Settings{Autostart: autostart.Status(), Resume: p.Resume, Last: p.Last, Notify: p.Notify}
+	st := autostart.Status()
+	s.autostartOn.Store(st.Enabled)
+	return Settings{Autostart: st, Resume: p.Resume, Last: p.Last, Notify: p.Notify}
 }
 
 // SetAutostart crée ou supprime la tâche qui lance Aria à l'ouverture de session.
@@ -59,6 +61,7 @@ func (s *ShieldService) doSetAutostart(on bool) SystemResult {
 			}
 		}
 		st := autostart.Status()
+		s.autostartOn.Store(st.Enabled)
 		return SystemResult{Steps: []Step{
 			{Label: "Copie protégée de l'exe", OK: true, Note: st.Exe},
 			{Label: "Tâche « " + autostart.TaskName + " » créée", OK: true, Note: "à l'ouverture de ta session, sans fenêtre UAC"},
@@ -70,6 +73,7 @@ func (s *ShieldService) doSetAutostart(on bool) SystemResult {
 			Error: err.Error(),
 		}
 	}
+	s.autostartOn.Store(false)
 	return SystemResult{Steps: []Step{
 		{Label: "Tâche planifiée supprimée", OK: true},
 		{Label: "Copie de Program Files retirée", OK: true},
@@ -131,6 +135,7 @@ func (s *ShieldService) refreshAutostart() {
 	if err != nil {
 		return
 	}
+	s.autostartOn.Store(autostart.Status().Enabled)
 	updated, err := autostart.Refresh(exe)
 	if updated {
 		s.logf("copie de Program Files remise à jour depuis %s", exe)

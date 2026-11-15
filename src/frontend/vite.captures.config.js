@@ -14,6 +14,11 @@ export default defineConfig({
         find: /^(\.\.\/)+bindings\/aria-shield$/,
         replacement: fileURLToPath(new URL('./captures/mock.js', import.meta.url)),
       },
+      // Le runtime Wails n'a rien à faire dans un navigateur ordinaire.
+      {
+        find: /^@wailsio\/runtime$/,
+        replacement: fileURLToPath(new URL('./captures/mock-runtime.js', import.meta.url)),
+      },
     ],
   },
   build: { outDir: 'dist-captures', emptyOutDir: true },
