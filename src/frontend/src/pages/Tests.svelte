@@ -9,7 +9,7 @@
 
   const tabs = [
     { id: 'resolveur', label: 'Résolveur et Windows' },
-    { id: 'fuites', label: 'Fuites d'IP' },
+    { id: 'fuites', label: "Fuites d'IP" },
     { id: 'navigateurs', label: 'Navigateurs' },
   ]
   let tab = $state('resolveur')
