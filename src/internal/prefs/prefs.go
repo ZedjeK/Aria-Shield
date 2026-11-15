@@ -106,6 +106,9 @@ type Prefs struct {
 	Allow []string `json:"exceptions,omitempty"`
 	// Fond : fond animé de la zone principale de la fenêtre.
 	Fond Fond `json:"fond"`
+	// Verrou : verrou au démarrage (pare-feu persistant, voir killswitch/lock_windows.go).
+	// Lu par Aria en administrateur, mais il ne peut que demander plus de blocage.
+	Verrou bool `json:"verrou-demarrage"`
 }
 
 // defaults : reprise et notifications activées, rien à reprendre au premier lancement.

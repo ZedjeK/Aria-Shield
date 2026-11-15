@@ -65,6 +65,7 @@ type trayState struct {
 	Others    []trayProfile
 	Update    string // version plus récente publiée, "" sinon
 	Autostart bool   // démarrage avec Windows activé
+	Locked    bool   // verrou au démarrage posé, tunnel pas monté : Internet coupé
 }
 
 // trayPage est une page de l'interface où le menu peut mener.
@@ -82,7 +83,7 @@ var trayPages = []trayPage{
 // signature résume l'état : l'icône et le menu ne sont refaits que si elle change.
 func (st trayState) signature() string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "%v|%v|%v|%v|%v|%v|%v|%s|%s|%v", st.DNS, st.Protected, st.Leak, st.VPNReady, st.Ads, st.AdsOn, st.AdsPaused, st.Active, st.Update, st.Autostart)
+	fmt.Fprintf(&b, "%v|%v|%v|%v|%v|%v|%v|%s|%s|%v|%v", st.DNS, st.Protected, st.Leak, st.VPNReady, st.Ads, st.AdsOn, st.AdsPaused, st.Active, st.Update, st.Autostart, st.Locked)
 	for _, p := range st.Others {
 		b.WriteString("|" + p.ID + "=" + p.Name)
 	}
@@ -93,6 +94,8 @@ func (st trayState) signature() string {
 func (st trayState) summary() string {
 	var s string
 	switch {
+	case st.Locked:
+		s = "VERROU : Internet coupé tant que le tunnel n'est pas monté"
 	case st.Protected && st.Leak:
 		s = "ALERTE : fuite détectée"
 	case st.Protected:
@@ -121,7 +124,7 @@ func (st trayState) summary() string {
 // bleu (information).
 func (st trayState) icon() []byte {
 	switch {
-	case st.Protected && st.Leak:
+	case st.Locked, st.Protected && st.Leak:
 		return iconAlert
 	case st.Protected:
 		return iconDiscret
@@ -146,6 +149,7 @@ func (s *ShieldService) trayState() trayState {
 		AdsPaused: s.adPaused(),
 		Update:    s.updateLatest(),
 		Autostart: s.autostartOn.Load(),
+		Locked:    s.lockOn.Load() && !tun.Full,
 	}
 	s.mu.Lock()
 	if s.lastLeak != nil {

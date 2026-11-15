@@ -36,6 +36,10 @@ type Settings struct {
 	Resume    bool            `json:"resume"`
 	Last      string          `json:"last"` // aucune, dns ou discret
 	Notify    bool            `json:"notify"`
+	// Verrou au démarrage : réglage, verrou posé, et raison s'il est impossible.
+	Lock       bool   `json:"lock"`
+	LockOn     bool   `json:"lockOn"`
+	LockReason string `json:"lockReason"`
 }
 
 // Settings lit les réglages (interroge le Planificateur de tâches : à
@@ -44,7 +48,9 @@ func (s *ShieldService) Settings() Settings {
 	p := s.prefs.Load()
 	st := autostart.Status()
 	s.autostartOn.Store(st.Enabled)
-	return Settings{Autostart: st, Resume: p.Resume, Last: p.Last, Notify: p.Notify}
+	_, why := s.lockCheck()
+	return Settings{Autostart: st, Resume: p.Resume, Last: p.Last, Notify: p.Notify,
+		Lock: p.Verrou, LockOn: s.lockOn.Load(), LockReason: why}
 }
 
 // SetAutostart crée ou supprime la tâche qui lance Aria à l'ouverture de session.
@@ -74,16 +80,20 @@ func (s *ShieldService) doSetAutostart(on bool) SystemResult {
 		}
 	}
 	s.autostartOn.Store(false)
-	return SystemResult{Steps: []Step{
+	steps := []Step{
 		{Label: "Tâche planifiée supprimée", OK: true},
 		{Label: "Copie de Program Files retirée", OK: true},
-	}}
+	}
+	return SystemResult{Steps: append(steps, s.lockSettingOff("il demande le démarrage avec Windows")...)}
 }
 
 // SetResume active ou non la réactivation de la dernière protection au lancement.
 func (s *ShieldService) doSetResume(on bool) SystemResult {
 	if err := s.prefs.Update(func(p *prefs.Prefs) { p.Resume = on }); err != nil {
 		return SystemResult{Error: "réglage non enregistré : " + err.Error()}
+	}
+	if !on {
+		return SystemResult{Steps: s.lockSettingOff("il demande la réactivation au lancement")}
 	}
 	return SystemResult{}
 }
@@ -109,6 +119,7 @@ func (s *ShieldService) Quit() {
 
 // quit prévient puis quitte (menu de l'icône ou bouton de l'interface).
 func (s *ShieldService) quit() {
+	s.userQuit.Store(true)
 	s.quitting.Store(true)
 	s.logf("« Quitter » demandé")
 	s.alert("Aria Shield est fermée", "Ta connexion d'origine est rétablie. Relance Aria pour retrouver ta protection.")
@@ -181,7 +192,11 @@ func (s *ShieldService) resume() {
 		}
 		if time.Now().After(deadline) {
 			s.addNotice("Impossible de réactiver " + what + " au lancement : " + msg)
-			s.alert("Protection non réactivée", "Aria n'a pas pu réactiver "+what+" : "+msg)
+			body := "Aria n'a pas pu réactiver " + what + " : " + msg
+			if s.lockOn.Load() {
+				body += " Le verrou au démarrage coupe Internet : retire-le dans Réglages, ou avec « Aria-Shield.exe --deverrouiller »."
+			}
+			s.alert("Protection non réactivée", body)
 			return
 		}
 		select {

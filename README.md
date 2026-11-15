@@ -81,7 +81,9 @@ Si tu actives « Démarrer avec Windows », Aria ajoute une tâche planifiée `\
 
 Les **notifications Windows** (incident, réactivation impossible au lancement, sortie d'Aria) obligent Aria à s'inscrire dans ton registre utilisateur : `HKCU\Software\Classes\AppUserModelId\Aria Shield`, `HKCU\Software\Classes\CLSID\{GUID}` et `HKCU\Software\Aria Shield`. Rien n'y est écrit tant qu'elles sont désactivées, et les désactiver efface ces clés.
 
-**Pour tout désinstaller** : dans « réglages », désactive « Démarrer avec Windows » (tâche et copie retirées) et « Notifications Windows » (clés du registre effacées), clique sur « restaurer --tout », quitte Aria, puis supprime l'exe et ces deux dossiers (le second demande une confirmation administrateur).
+**Verrou au démarrage** (désactivé par défaut, dans « réglages ») : en mode Discret, le kill switch normal disparaît dès qu'Aria s'arrête, et rien ne protège entre le démarrage du PC et la remontée du tunnel. Le verrou pose des règles de pare-feu **persistantes**, gardées au redémarrage : hors du tunnel, rien ne sort, sauf Aria elle-même (pour joindre le serveur VPN), la boucle locale, DHCP et NDP. Il demande « Démarrer avec Windows », « Réactiver ma dernière protection », un profil dont le serveur est une adresse IP, et Aria lancée depuis sa copie de Program Files. Il est retiré quand tu désactives la protection, quand tu quittes Aria et par « restaurer --tout » ; une fin de session Windows le laisse en place. **Si le serveur VPN ne répond pas, Internet reste coupé** : retire le verrou dans « réglages », ou lance `Aria-Shield.exe --deverrouiller` en administrateur.
+
+**Pour tout désinstaller** : dans « réglages », désactive « Verrou au démarrage » s'il est actif, « Démarrer avec Windows » (tâche et copie retirées) et « Notifications Windows » (clés du registre effacées), clique sur « restaurer --tout », quitte Aria, puis supprime l'exe et ces deux dossiers (le second demande une confirmation administrateur).
 
 Depuis la v0.7, l'ancien dossier `AriaShield-data` des versions précédentes est déplacé automatiquement vers ces emplacements au premier lancement, puis supprimé. Ferme l'ancienne version d'Aria avant de lancer la nouvelle.
 
@@ -104,7 +106,7 @@ Pour revenir à la normale à tout moment : « restaurer --tout », en bas de la
 
 ## Sécurité
 
-- **Rien ne reste derrière toi** : à la désactivation, quand tu quittes Aria et même en cas de plantage, ton DNS d'origine revient, le kill switch disparaît (session de pare-feu dynamique) et le pilote VPN est retiré.
+- **Rien ne reste derrière toi** : à la désactivation, quand tu quittes Aria et même en cas de plantage, ton DNS d'origine revient, le kill switch disparaît (session de pare-feu dynamique) et le pilote VPN est retiré. Seule exception, voulue : le verrou au démarrage, s'il est activé, reste en place après un plantage ou un redémarrage, jusqu'à ce qu'Aria remonte le tunnel ou que tu le retires.
 - **Profils VPN chiffrés** avec DPAPI, liés à ton compte Windows. Les clés ne quittent jamais la partie Go d'Aria : l'interface ne les reçoit pas, même pour les afficher. À l'import d'un `.conf`, c'est Aria qui lit le fichier ; les commandes qu'il pourrait contenir (`PostUp`…) sont ignorées, jamais exécutées.
 - **Aucune fuite pendant une bascule** : changer de serveur garde la même carte réseau et le même kill switch ; si le nouveau serveur ne répond pas, Aria revient sur l'ancien.
 - **Composants vérifiés** : chaque binaire embarqué vient de la source officielle, avec sa signature vérifiée (voir plus bas). Aria revérifie leur empreinte ou leur signature avant chaque utilisation.
@@ -120,6 +122,7 @@ Pour signaler une faille : voir [SECURITY.md](SECURITY.md). Ce qu'Aria écrit ho
 
 ### Limites à connaître
 
+- Le verrou au démarrage n'a pas été essayé sur beaucoup de machines : il repose sur une règle d'arbitrage du pare-feu de Windows (les sorties par le tunnel autorisées « en dur » passent devant le blocage du verrou). Garde `Aria-Shield.exe --deverrouiller` sous la main la première fois. Sous verrou, aucune connexion entrante ne passe par le tunnel.
 - Le blocage des pubs agit sur les noms de domaine : les pubs servies depuis le domaine du site lui-même (YouTube, par exemple) passent, et un navigateur dont le « DNS sécurisé » est activé contourne Aria (la page Tests le signale). Dans le navigateur, un bloqueur comme uBlock Origin reste plus efficace ; les deux se complètent.
 - La liste OISD est téléchargée sur ta machine à l'activation, puis chaque semaine au lancement, sans signature : c'est pour cela qu'Aria la filtre. Elle n'est pas embarquée dans l'exe (elle est sous licence GPLv3, Aria sous MIT). Avec la liste, Unbound prend une quinzaine de Mo de mémoire en plus (« small ») ou environ 70 (« big »).
 

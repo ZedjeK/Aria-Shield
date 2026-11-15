@@ -7,7 +7,7 @@
   import Subtabs from '../lib/Subtabs.svelte'
   import Know from '../lib/Know.svelte'
   import {
-    app, settings, loadSettings, setAutostart, setResume, setNotifications, quitApp,
+    app, settings, loadSettings, setAutostart, setResume, setNotifications, setLock, quitApp,
     update, loadUpdate, checkUpdate, setUpdateCheck,
     fond, setFond, FOND_MIN, FOND_MAX,
   } from '../lib/state.svelte.js'
@@ -89,6 +89,28 @@
           onchange={setNotifications}
         />
       </div>
+      <div class="row">
+        <span class="row-text">
+          <span class="row-name">Verrou au démarrage</span>
+          <span class="row-detail">
+            {d?.lockOn ? 'Posé : hors du tunnel, rien ne sort, même après un redémarrage' : "En mode Discret, bloque tout hors du tunnel, du démarrage du PC jusqu'à la remontée du tunnel"}
+          </span>
+        </span>
+        <Switch
+          checked={d?.lock ?? false}
+          disabled={!d || app.busy || (!d.lock && Boolean(d.lockReason))}
+          label="Verrou au démarrage"
+          onchange={setLock}
+        />
+      </div>
+      {#if d && !d.lock && d.lockReason}
+        <p class="hint">{d.lockReason}</p>
+      {/if}
+      {#if d?.lock}
+        <p class="warn-text">
+          Si le serveur VPN ne répond pas, Internet reste coupé. Pour lever le verrou : cet interrupteur, ou « Aria-Shield.exe --deverrouiller » lancé en administrateur.
+        </p>
+      {/if}
       {#if settings.error}
         <p class="error" role="alert">{settings.error}</p>
       {/if}
@@ -247,6 +269,12 @@
 </div>
 
 <style>
+  .warn-text {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--warn);
+  }
   .selectable {
     user-select: text;
     font-size: 12px;

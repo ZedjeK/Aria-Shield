@@ -7,6 +7,7 @@ sont dans `docs/releases/`.
 
 ### Ajouté
 
+- Verrou au démarrage (désactivé par défaut) : en mode Discret, des règles de pare-feu persistantes bloquent tout hors du tunnel, du démarrage du PC jusqu'à la remontée du tunnel et après un plantage d'Aria. Commande de secours `Aria-Shield.exe --deverrouiller`.
 - Fond animé « couloirs » dans la zone principale : un double sas en flux continu qui suit l'état de la protection, avec ses réglages (actif, vitesse, nombre de points) dans « réglages ».
 - Compteur de requêtes bloquées et classement des domaines qui bloquent le plus (page Résolveur DNS).
 - Fiche projet `docs/FICHE.md`, `SECURITY.md` et ce journal des versions.

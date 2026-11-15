@@ -45,6 +45,7 @@ const statut = {
   logPath: 'C:\\Users\\exemple\\.Aria-Shield\\aria.log',
   newVersion: etat === 'off' ? '0.12' : '',
   version: '0.11.0',
+  locked: false,
 }
 
 const journal = {
@@ -102,10 +103,11 @@ export const ShieldService = {
   TorUpdate: plus_tard(rien),
   TorLaunch: plus_tard(rien),
 
-  Settings: plus_tard({ autostart: { enabled: true, exe: 'C:\\Program Files\\Aria Shield\\Aria-Shield.exe' }, resume: true, last: protege ? 'discret' : 'dns', notify: true }),
+  Settings: plus_tard({ autostart: { enabled: true, exe: 'C:\\Program Files\\Aria Shield\\Aria-Shield.exe' }, resume: true, last: protege ? 'discret' : 'dns', notify: true, lock: protege, lockOn: protege, lockReason: protege ? '' : "Active d'abord « Démarrer avec Windows » : le verrou ne laisse sortir que la copie d'Aria de Program Files." }),
   SetAutostart: plus_tard(rien),
   SetResume: plus_tard(rien),
   SetNotifications: plus_tard(rien),
+  SetLock: plus_tard(rien),
   Fond: plus_tard({ actif: true, vitesse: 'normale', minimum: 10, maximum: 26 }),
   SetFond: (actif, vitesse, minimum, maximum) => Promise.resolve({ actif, vitesse, minimum, maximum }),
   Quit: plus_tard(undefined),
