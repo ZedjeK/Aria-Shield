@@ -1,8 +1,15 @@
 // Package killswitch est le pare-feu WFP de wireguard-windows (tunnel/firewall,
-// licence MIT, voir COPYING-wireguard-windows.txt), adapté pour Aria : la seule
-// modification autorise le processus Aria (chemin de l'exe + utilisateur) au
-// lieu du SID du service WireGuard. La session WFP est dynamique : Windows retire
-// toutes les règles dès qu'Aria se ferme, même en cas de plantage.
+// licence MIT, voir COPYING-wireguard-windows.txt), adapté pour Aria :
+//
+//   - il autorise le processus Aria (chemin de l'exe + utilisateur) au lieu du
+//     SID du service WireGuard ;
+//   - addFilter (blocker.go) ajoute à chaque filtre les réglages du verrou
+//     persistant, et les sorties par le tunnel peuvent être autorisées « en
+//     dur » (SetHardTunnel) ;
+//   - lock_windows.go ajoute le verrou persistant (voir ce fichier).
+//
+// La session du kill switch est dynamique : Windows retire ses règles dès
+// qu'Aria se ferme, même en cas de plantage. Le verrou, lui, reste posé.
 //
 // Ce que laisse passer le kill switch (rules.go), tout le reste étant bloqué :
 //
