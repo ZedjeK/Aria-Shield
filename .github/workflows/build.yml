@@ -1,10 +1,23 @@
 # Compile Aria-Shield.exe sur une machine Windows de GitHub.
 #
-# - push sur main : compilation + tests, l'exe est gardé 7 jours comme artefact.
-# - tag v* : idem, puis attestation de provenance et release créée EN BROUILLON :
-#   elle reste invisible du public tant qu'elle n'est pas publiée à la main,
-#   après relecture (page Releases, ou : gh release edit vX.Y --draft=false).
-#   Les notes viennent de docs/releases/<tag>.md, l'empreinte SHA-256 est ajoutée.
+# - PR vers main et push sur main : tests et compilation ; l'exe est gardé 7 jours comme artefact.
+#   Aucun filtre de chemins : un workflow ignoré laisserait le check « tests » en attente, et le ruleset de main
+#   l'exige (une PR qui ne touche que des notes serait alors infusionnable).
+# - tag vX.Y.Z : idem, puis attestation de provenance et release créée EN BROUILLON :
+#   elle reste invisible du public tant qu'elle n'est pas publiée à la main, après relecture
+#   (page Releases, ou : gh release edit vX.Y.Z --draft=false). Publier est le geste qui prévient les utilisateurs :
+#   aucun workflow ne le fait. Les notes viennent de docs/releases/<tag>.md, l'empreinte SHA-256 est ajoutée.
+#
+#       git tag -a v1.2.3 -m "Version 1.2.3"; git push origin v1.2.3
+#
+#   Le tag doit être « v » suivi de la version de tools/version.ps1, et son commit doit appartenir à la branche par
+#   défaut. Les notes, la fiche projet et les licences doivent être complètes (tools/verifier-release.ps1).
+#
+# Deux jobs : « tests » ne fait que lire (tests, exe, empreinte) ; « publication » est le seul dont le jeton peut
+# écrire, et il n'exécute aucun code du dépôt. Le nom « tests » est celui que le ruleset de main exige : ne jamais le
+# renommer.
+#
+# Essai à blanc, sans tag : « gh workflow run Compilation --ref <branche> » ; « publication » ne tourne pas.
 #
 # Vérifier qu'un exe publié vient bien de ce dépôt :
 #   gh attestation verify Aria-Shield.exe -R ZedjeK/Aria-Shield
@@ -12,10 +25,11 @@
 name: Compilation
 
 on:
+  pull_request:
+    branches: [main]
   push:
     branches: [main]
     tags: ['v*']
-    paths-ignore: ['**.md', 'docs/**', 'LICENSE', 'LICENCES-TIERS.txt']
   workflow_dispatch:
 
 permissions:
@@ -23,16 +37,13 @@ permissions:
 
 concurrency:
   group: build-${{ github.ref }}
-  cancel-in-progress: false
+  # Seulement sur les PR : deux fusions rapprochées n'annulent pas le run de main, ni un tag celui d'une PR.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  build:
+  tests: # ce nom est celui que le ruleset exige : ne jamais le renommer
     runs-on: windows-latest
     timeout-minutes: 40
-    permissions:
-      contents: write # création de la release (tags seulement)
-      id-token: write # attestation de provenance
-      attestations: write
     env:
       IS_RELEASE: ${{ startsWith(github.ref, 'refs/tags/v') }}
 
@@ -41,6 +52,18 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0 # tout l'historique : il faut pouvoir situer un tag par rapport à la branche par défaut
+
+      - name: Le tag est sur la branche par défaut
+        if: env.IS_RELEASE == 'true'
+        shell: pwsh
+        env:
+          BRANCHE: ${{ github.event.repository.default_branch }}
+        run: |
+          git merge-base --is-ancestor $env:GITHUB_SHA "origin/$env:BRANCHE"
+          if ($LASTEXITCODE -ne 0) {
+            throw "Le tag $env:GITHUB_REF_NAME pointe sur un commit qui n'est pas dans $env:BRANCHE : aucune release."
+          }
 
       - name: Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -53,17 +76,24 @@ jobs:
         with:
           node-version: lts/*
 
-      - name: Version de l'exe cohérente avec le tag
+      - name: Le tag est celui de la version
         if: env.IS_RELEASE == 'true'
-        shell: bash
+        shell: pwsh
         run: |
-          want="${GITHUB_REF_NAME#v}"
-          have=$(sed -n 's/.*"ProductVersion": *"\([^"]*\)".*/\1/p' src/build/windows/info.json)
-          if [ "$have" != "$want" ] && [ "$have" != "$want.0" ]; then
-            echo "::error::info.json annonce $have, le tag est $GITHUB_REF_NAME"
-            exit 1
-          fi
-          test -f "docs/releases/$GITHUB_REF_NAME.md" || { echo "::error::notes manquantes : docs/releases/$GITHUB_REF_NAME.md"; exit 1; }
+          $version = "$(./tools/version.ps1 | Select-Object -Last 1)".Trim()
+          if ("v$version" -ne $env:GITHUB_REF_NAME) {
+            throw "Le tag $env:GITHUB_REF_NAME ne correspond pas à la version $version donnée par tools/version.ps1."
+          }
+
+      - name: Notes, fiche projet et licences complètes
+        if: env.IS_RELEASE == 'true'
+        shell: pwsh
+        run: ./tools/verifier-release.ps1 -Tag $env:GITHUB_REF_NAME
+
+      - name: Ce qui manque encore pour sortir cette version (essai à blanc)
+        if: github.event_name == 'workflow_dispatch'
+        shell: pwsh
+        run: ./tools/verifier-release.ps1 -EssaiABlanc
 
       - name: Tor Browser (téléchargé puis signature PGP vérifiée)
         shell: bash
@@ -93,57 +123,77 @@ jobs:
           echo "Tor Browser $ver : signature valide"
 
       - name: Tests
-        working-directory: src
-        shell: bash
-        run: |
-          set -o pipefail
-          if ! go test ./internal/... 2>&1 | tee "$RUNNER_TEMP/tests.log"; then
-            # Les échecs remontent en annotations, lisibles sans ouvrir les journaux
-            grep -E -- '--- FAIL|_test\.go:[0-9]+|^FAIL|panic:' "$RUNNER_TEMP/tests.log" | head -20 \
-              | while IFS= read -r line; do echo "::error::$line"; done
-            exit 1
-          fi
+        shell: pwsh
+        run: ./tools/tester.ps1
+
+      # Les scripts .ps1 doivent aussi tourner sous Windows PowerShell 5.1, celui livré avec Windows.
+      # Même job : le check exigé par le ruleset garde son nom « tests ». Go a mis ses résultats en cache.
+      - name: Tests sous Windows PowerShell 5.1
+        shell: powershell
+        run: ./tools/tester.ps1
 
       - name: Compilation
         shell: pwsh
         run: powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1
 
       - name: Empreinte
-        id: hash
         shell: bash
         run: |
           sha=$(sha256sum Aria-Shield.exe | cut -d' ' -f1)
-          echo "sha256=$sha" >> "$GITHUB_OUTPUT"
+          echo "$sha  Aria-Shield.exe" > Aria-Shield.exe.sha256
           echo "### Aria-Shield.exe" >> "$GITHUB_STEP_SUMMARY"
           echo "SHA-256 : \`$sha\`" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Exe gardé 7 jours
-        if: env.IS_RELEASE != 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: Aria-Shield-${{ github.sha }}
-          path: Aria-Shield.exe
+          name: ${{ env.IS_RELEASE == 'true' && 'release' || format('Aria-Shield-{0}', github.sha) }}
+          path: |
+            Aria-Shield.exe
+            Aria-Shield.exe.sha256
           retention-days: 7
 
+  publication:
+    needs: tests
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') # jamais sur un essai à blanc
+    runs-on: windows-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write # création de la release
+      id-token: write # attestation de provenance
+      attestations: write
+    steps:
+      # Seulement pour lire les notes de version : aucun code du dépôt n'est exécuté dans ce job.
+      - name: Sources
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Exe et empreinte du job « tests »
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release
+          path: release
+
       - name: Attestation de provenance
-        if: env.IS_RELEASE == 'true'
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
-          subject-path: Aria-Shield.exe
+          subject-path: release/Aria-Shield.exe
 
-      - name: Release
-        if: env.IS_RELEASE == 'true'
+      - name: Release en brouillon
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          SHA256: ${{ steps.hash.outputs.sha256 }}
         run: |
+          notes="docs/releases/$GITHUB_REF_NAME.md"
+          test -f "$notes" || { echo "::error::$notes est introuvable : aucune release sans notes de version."; exit 1; }
+          sha=$(cut -d' ' -f1 release/Aria-Shield.exe.sha256)
           {
-            cat "docs/releases/$GITHUB_REF_NAME.md"
+            cat "$notes"
             echo
             echo "## Vérification"
             echo
-            echo "SHA-256 de \`Aria-Shield.exe\` : \`$SHA256\`"
+            echo "SHA-256 de \`Aria-Shield.exe\` : \`$sha\`"
             echo
             echo "Compilé par GitHub Actions à partir du commit $GITHUB_SHA. Pour vérifier que l'exe vient bien de ce dépôt :"
             echo
@@ -151,7 +201,7 @@ jobs:
             echo "gh attestation verify Aria-Shield.exe -R $GITHUB_REPOSITORY"
             echo "\`\`\`"
           } > release-notes.md
-          gh release create "$GITHUB_REF_NAME" Aria-Shield.exe \
+          gh release create "$GITHUB_REF_NAME" release/Aria-Shield.exe release/Aria-Shield.exe.sha256 \
             --repo "$GITHUB_REPOSITORY" \
             --title "Aria Shield $GITHUB_REF_NAME" \
             --notes-file release-notes.md \
