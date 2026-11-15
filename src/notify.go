@@ -36,7 +36,8 @@ type notifier struct {
 	mu      sync.Mutex
 	ctx     context.Context
 	opts    application.ServiceOptions
-	started bool // le service de Wails a démarré dans ce processus
+	oldTemp string // %TEMP% d'avant la redirection du dossier temporaire ("" si elle n'a pas eu lieu)
+	started bool   // le service de Wails a démarré dans ce processus
 	cleaned bool // ses clés ont été effacées depuis (réglage désactivé)
 	seq     atomic.Int64
 }
@@ -101,7 +102,7 @@ func (n *notifier) setEnabled(on bool) (string, error) {
 	defer n.mu.Unlock()
 	if !on {
 		n.cleaned = true
-		return "inscription retirée du registre", toastreg.Remove(appName)
+		return "inscription retirée du registre", toastreg.Remove(appName, n.oldTemp)
 	}
 	if n.cleaned {
 		return "actives au prochain lancement d'Aria", nil

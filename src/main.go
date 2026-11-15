@@ -20,6 +20,7 @@ import (
 
 	"aria-shield/internal/autostart"
 	"aria-shield/internal/paths"
+	"aria-shield/internal/tempdir"
 	"aria-shield/internal/torbrowser"
 )
 
@@ -47,6 +48,16 @@ func main() {
 	svc := NewShieldService()
 	svc.silent = silent
 	svc.notify = newNotifier(svc.prefs)
+	// Rien dans %TEMP% : le service de notifications y déposerait l'icône. Son
+	// dossier temporaire devient le « cache » des données d'Aria, avant qu'il démarre.
+	if old, err := tempdir.Redirect(svc.userDir); err != nil {
+		svc.logf("dossier temporaire non redirigé (%v) : l'icône des notifications ira dans %%TEMP%%", err)
+	} else {
+		svc.notify.oldTemp = old
+		if n := tempdir.RemoveOld(old, appName+"{*}.png"); n > 0 {
+			svc.logf("%d icône(s) de notification laissée(s) dans l'ancien %%TEMP%% effacée(s)", n)
+		}
+	}
 	var window *application.WebviewWindow
 	showWindow := func() {
 		if window != nil {
